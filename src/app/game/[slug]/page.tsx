@@ -30,6 +30,22 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           </a>
         ))}
       </div>
+
+      {game.images.length > 0 && (
+        <section className="mt-14">
+          <h2 className="mb-4 text-lg font-semibold">Hình ảnh</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {game.images.map((src, i) => (
+              <a key={src} href={src} target="_blank" rel="noopener noreferrer"
+                 className="block overflow-hidden rounded-xl bg-neutral-900">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt={`${game.title} - ảnh ${i + 1}`} loading="lazy"
+                     className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.03]" />
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }
