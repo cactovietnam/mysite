@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useModal } from "@/lib/use-modal";
 import type { Game } from "@/data/games";
 import { providerOf } from "@/lib/game-ui";
 
@@ -9,12 +10,7 @@ export default function DownloadPanel({ links, title }: { links: Game["links"]; 
   const [copied, setCopied] = useState<string | null>(null);
   const safe = links.filter((l) => /^https?:\/\//i.test(l.url)); // chỉ nhận http/https
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  const modalRef = useModal(open, () => setOpen(false)); // khóa cuộn, nhốt Tab, Esc đóng, trả focus
 
   if (safe.length === 0) {
     return <p className="rounded-full bg-white/10 px-6 py-3 text-haze">Chưa có link tải cho game này.</p>;
@@ -42,7 +38,7 @@ export default function DownloadPanel({ links, title }: { links: Game["links"]; 
 
       {open && (
         <div className="anim-fade fixed inset-0 z-50 grid place-items-center bg-ink/75 p-4 backdrop-blur-sm" onClick={() => setOpen(false)}>
-          <div role="dialog" aria-modal="true" aria-label={`Link tải ${title}`}
+          <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Link tải ${title}`}
                className="glass anim-pop w-full max-w-md rounded-[2rem] p-5 shadow-2xl shadow-black/50"
                onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 px-1">

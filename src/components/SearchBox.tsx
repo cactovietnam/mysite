@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Fuse from "fuse.js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { games } from "@/data/games";
+import { useModal } from "@/lib/use-modal";
 import Cover from "./Cover";
 
 export default function SearchBox() {
@@ -11,22 +12,19 @@ export default function SearchBox() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
   const fuse = useMemo(() => new Fuse(games, { keys: ["title", "tags", "engine"], threshold: 0.35 }), []);
   const results = q ? fuse.search(q).slice(0, 6).map((r) => r.item) : games.slice(0, 5);
 
-  const close = () => { setOpen(false); setQ(""); setIdx(0); };
+  const close = useCallback(() => { setOpen(false); setQ(""); setIdx(0); }, []);
+  const dialogRef = useModal(open, close); // khóa cuộn, nhốt Tab, Esc đóng, trả focus
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setOpen(true); }
-      if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-
-  useEffect(() => { if (open) inputRef.current?.focus(); }, [open]);
 
   const onInputKey = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") { e.preventDefault(); setIdx((i) => Math.min(i + 1, results.length - 1)); }
@@ -47,10 +45,10 @@ export default function SearchBox() {
 
       {open && (
         <div className="anim-fade fixed inset-0 z-50 flex items-start justify-center bg-ink/70 px-4 pt-[12vh] backdrop-blur-sm" onClick={close}>
-          <div role="dialog" aria-modal="true" aria-label="Tìm game"
-               className="glass anim-pop w-full max-w-xl rounded-[1.75rem] p-3 shadow-2xl shadow-black/50"
+          <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Tìm game"
+               className="glass anim-pop w-full max-w-xl rounded-[1.75rem] p-3 shadow-2xl shadow-black/50 outline-none"
                onClick={(e) => e.stopPropagation()}>
-            <input ref={inputRef} value={q} onChange={(e) => { setQ(e.target.value); setIdx(0); }} onKeyDown={onInputKey}
+            <input data-autofocus value={q} onChange={(e) => { setQ(e.target.value); setIdx(0); }} onKeyDown={onInputKey}
                    placeholder="Tìm theo tên, tag hoặc engine"
                    className="w-full rounded-2xl bg-white/[0.07] px-5 py-3.5 text-lg outline-none placeholder:text-haze focus:bg-white/10" />
             <ul className="mt-2 space-y-1">

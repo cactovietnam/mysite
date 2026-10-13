@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { games } from "@/data/games";
+import { site } from "@/data/site";
 import { fmtDate } from "@/lib/game-ui";
 import Cover from "@/components/Cover";
 import DownloadPanel from "@/components/DownloadPanel";
 import EngineChip from "@/components/EngineChip";
 import Gallery from "@/components/Gallery";
 import SimilarGames from "@/components/SimilarGames";
+import TagList from "@/components/TagList";
 
 export function generateStaticParams() {
   return games.map((g) => ({ slug: g.slug }));
@@ -37,18 +39,15 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
 
   return (
     <main>
-      {/* Hero: ảnh game rõ nét bên phải, bị "che" dần bằng lớp tối từ trái sang và từ dưới lên */}
+      {/* Hero: ảnh CHÍNH rõ nét bên phải, bị "che" dần bằng lớp tối từ trái sang và từ dưới lên */}
       <section className="relative isolate -mt-14 flex min-h-[560px] md:min-h-[min(82vh,760px)] items-end overflow-hidden">
         <div aria-hidden className="absolute inset-0 -z-10">
-          <Cover decorative src={game.cover} title={game.title} engine={game.engine}
+          <Cover decorative priority src={game.cover} title={game.title} engine={game.engine}
                  className="h-full w-full object-cover object-[60%_20%] md:object-[65%_25%]" />
-          {/* máy tính: tối dần từ trái sang, chừa bên phải để thấy rõ ảnh game */}
           <div className="absolute inset-0 hidden md:block"
                style={{ background: "linear-gradient(90deg, #0f0c1a 0%, rgba(15,12,26,0.9) 24%, rgba(15,12,26,0.5) 46%, rgba(15,12,26,0) 72%)" }} />
-          {/* điện thoại: ảnh rõ ở trên, tối dần xuống chỗ chữ */}
           <div className="absolute inset-0 md:hidden"
                style={{ background: "linear-gradient(180deg, rgba(15,12,26,0.45) 0%, rgba(15,12,26,0) 24%, rgba(15,12,26,0.85) 62%, #0f0c1a 100%)" }} />
-          {/* chân hero hòa vào nền, đỉnh hơi tối để thanh menu dễ đọc */}
           <div className="absolute inset-0"
                style={{ background: "linear-gradient(0deg, #0f0c1a 0%, rgba(15,12,26,0) 20%), linear-gradient(180deg, rgba(15,12,26,0.6) 0%, rgba(15,12,26,0) 18%)" }} />
         </div>
@@ -58,15 +57,11 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
             <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="m12 4-6 6 6 6" />
             </svg>
-            Kho game
+            {site.home.libraryTitle}
           </Link>
 
-          <div className="mt-7 flex flex-wrap gap-2">
-            <EngineChip engine={game.engine} className="glass" />
-            {game.tags.map((t) => (
-              <span key={t} className="glass rounded-full px-3.5 py-1 text-xs font-medium">{t}</span>
-            ))}
-          </div>
+          {/* Tag tự xuống dòng; quá 10 tag thì gập lại + "Xem thêm" */}
+          <TagList className="mt-7 max-w-3xl" lead={<EngineChip engine={game.engine} className="glass" />} tags={game.tags} />
 
           <h1 className="mt-5 max-w-[18ch] font-display text-4xl font-extrabold leading-[0.98] tracking-tight text-balance sm:text-6xl md:text-7xl">
             {game.title}
@@ -94,7 +89,6 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
         </div>
       </section>
 
-      {/* Thân trang: cột trái = thông tin + gợi ý, cột phải = giới thiệu + ảnh */}
       <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-24 pt-6 lg:grid-cols-[340px_1fr] lg:gap-12">
         <aside className="order-2 space-y-8 lg:order-1">
           <dl className="glass divide-y divide-white/10 rounded-[1.75rem] px-5">
@@ -119,6 +113,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
             <p className="max-w-[62ch] whitespace-pre-line text-lg leading-relaxed text-mist/80">{game.description}</p>
           </section>
 
+          {/* Ảnh BỔ SUNG (tối đa 10): giúp hiểu thêm về game, không gồm ảnh chính */}
           {game.images.length > 0 && (
             <section id="hinh-anh" className="scroll-mt-24">
               <div className="mb-4 flex items-end justify-between">

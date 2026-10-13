@@ -1,0 +1,25 @@
+{
+  "name": "GSVH",
+  "url": "https://mysite.vercel.app",
+  "description": "Danh sách game và hướng dẫn cài đặt.",
+  "discord": "https://discord.gg/",
+  "footer": "© 2026 MySite",
+  "nav": {
+    "explore": "Khám phá",
+    "discord": "Discord"
+  },
+  "home": {
+    "libraryTitle": "Kho game",
+    "featuredBadge": "Mới cập nhật",
+    "featuredButton": "Xem game"
+  },
+  "ageGate": {
+    "enabled": true
+  },
+  "engines": {
+    "Ren'Py": "#a78bfa",
+    "RPGM": "#2dd4bf",
+    "Unity": "#60a5fa",
+    "Unreal": "#fbbf24"
+  }
+}

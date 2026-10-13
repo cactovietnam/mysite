@@ -1,10 +1,7 @@
+import { site } from "@/data/site";
+
 // Màu theo engine: mỗi engine một màu để nhận ra ngay trên thẻ, huy hiệu và ánh sáng quanh ảnh.
-const ENGINE_COLOR: Record<string, string> = {
-  "Ren'Py": "#a78bfa",
-  RPGM: "#2dd4bf",
-  Unity: "#60a5fa",
-  Unreal: "#fbbf24",
-};
+const ENGINE_COLOR: Record<string, string> = site.engines; // sửa/thêm màu trong src/data/site.json
 
 export const engineColor = (engine: string) => ENGINE_COLOR[engine] ?? "#9d94c4";
 

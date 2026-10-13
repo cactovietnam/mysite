@@ -32,7 +32,8 @@ export default function Cover({ src, title, engine, className = "", priority, de
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      ref={(el) => { if (el && el.complete && el.naturalWidth === 0) setFailed(true); }}
+      // chỉ ảnh eager mới kiểm tra lỗi trước hydrate; ảnh lazy chưa tải có thể báo complete sai
+      ref={(el) => { if (el && priority && el.complete && el.naturalWidth === 0) setFailed(true); }}
       src={src}
       alt={decorative ? "" : title}
       aria-hidden={decorative || undefined}

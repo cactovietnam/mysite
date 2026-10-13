@@ -4,6 +4,7 @@ import { engineColor, fmtDate } from "@/lib/game-ui";
 import Cover from "./Cover";
 import EngineChip from "./EngineChip";
 import Tilt from "./Tilt";
+import { site } from "@/data/site";
 
 const d = (ms: number) => ({ "--d": `${ms}ms` }) as React.CSSProperties;
 
@@ -27,7 +28,7 @@ export default function Hero({ game }: { game: Game }) {
                 <span className="absolute inset-0 animate-ping rounded-full bg-berry/70" />
                 <span className="relative size-2 rounded-full bg-berry" />
               </span>
-              Mới cập nhật
+              {site.home.featuredBadge}
             </p>
 
             <h1 className="anim-rise mt-5 font-display text-5xl font-extrabold leading-[0.95] tracking-tight text-balance sm:text-6xl md:text-7xl" style={d(90)}>
@@ -48,7 +49,7 @@ export default function Hero({ game }: { game: Game }) {
             <div className="anim-rise mt-9" style={d(340)}>
               <Link href={`/game/${game.slug}`}
                     className="inline-flex items-center rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_-10px_var(--color-berry)] active:translate-y-0">
-                Xem game
+                {site.home.featuredButton}
               </Link>
             </div>
           </div>
