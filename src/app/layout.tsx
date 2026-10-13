@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Bricolage_Grotesque, Be_Vietnam_Pro } from "next/font/google";
 import SearchBox from "@/components/SearchBox";
 import AgeGate from "@/components/AgeGate";
+import ReloadReset from "@/components/ReloadReset";
 import { site, siteUrl } from "@/data/site";
 
 const display = Bricolage_Grotesque({ subsets: ["latin", "vietnamese"], variable: "--font-bricolage" });
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="vi" className={`${display.variable} ${sans.variable}`}>
       <body className="flex min-h-dvh flex-col font-sans antialiased">
+        <ReloadReset />
         {site.ageGate.enabled && <AgeGate />}
         <header className="sticky top-4 z-40 px-4">
           <div className="glass mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full pl-6 pr-2 shadow-lg shadow-black/20">
