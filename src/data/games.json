@@ -1,29 +1,32 @@
 [
   {
-    "slug": "game-mau-1",
-    "title": "Game Mẫu Một",
-    "engine": "Ren'Py",
-    "version": "1.0.0",
-    "sizeGB": 3.8,
-    "cover": "/covers/game-mau-1/6741c3beb6.webp",
-    "images": [
-      "/covers/game-mau-1/6741c3beb6.webp",
-      "/covers/game-mau-1/7e8a236f50.webp",
-      "/covers/game-mau-1/77b9f6cbd3.webp",
-      "/covers/game-mau-1/e44f7e48b4.webp",
-      "/covers/game-mau-1/3bfffb2924.webp",
-      "/covers/game-mau-1/8c29401c2b.webp"
-    ],
+    "slug": "above-the-immortalit-realm",
+    "title": "Above the Immortalit Realm",
+    "engine": "Unity",
+    "version": "0.7.0",
+    "sizeGB": 1.4,
+    "cover": "",
+    "images": [],
     "tags": [
-      "Visual Novel",
-      "Fantasy"
+      "Adult",
+      "Eroge",
+      "Erotic",
+      "Fantasy",
+      "Kung Fu",
+      "No AI",
+      "NSFW",
+      "Romance",
+      "Anime",
+      "2DCG",
+      "Netori",
+      "Animation"
     ],
-    "description": "Mô tả ngắn về game. Thay nội dung này bằng giới thiệu thật, 2-4 câu là đủ.",
-    "updatedAt": "2026-10-12",
+    "description": "Đây là một tựa game chủ đề Netori lấy bối cảnh thế giới tu tiên. Bạn vào vai Mặc Thăng — một đệ tử bình thường chỉ có tư chất trung bình tại một tông môn được gọi là Huyền Môn.",
+    "updatedAt": "2026-10-13",
     "links": [
       {
-        "label": "Hướng dẫn cài đặt",
-        "url": "https://example.com"
+        "label": "",
+        "url": "https://gofile.io/d/qlusytMA"
       }
     ]
   }
