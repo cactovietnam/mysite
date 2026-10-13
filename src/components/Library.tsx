@@ -5,6 +5,7 @@ import { site } from "@/data/site";
 import { applyFilters, buildTagIndex, parseFilters, serializeFilters, type Filters } from "@/lib/library-filter";
 import FilterPanel from "./FilterPanel";
 import GameCard from "./GameCard";
+import { EmptyArt, GhostCard } from "./LibraryArt";
 
 // Bộ lọc đồng bộ với URL (?engine=Unity&tag=Romance&mode=and&q=...&sort=name): chia sẻ được link, nút Back hoạt động.
 // Đọc URL bằng useSyncExternalStore: HTML tĩnh vẫn chứa đủ game, client lọc sau khi hydrate.
@@ -76,13 +77,18 @@ export default function Library({ games }: { games: Game[] }) {
 
         {list.length > 0 ? (
           <div key={filters.engine ?? "all"} className="grid grid-cols-1 gap-x-3 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
-            {list.map((g) => (
-              <div key={g.slug} className="anim-pop"><GameCard game={g} /></div>
+            {list.map((g, i) => (
+              // stagger: thẻ vào lần lượt, trần 8 nhịp để danh sách dài không phải chờ
+              <div key={g.slug} className="anim-pop" style={{ "--d": `${Math.min(i, 8) * 55}ms` } as React.CSSProperties}>
+                <GameCard game={g} />
+              </div>
             ))}
+            {!dirty && Array.from({ length: Math.max(0, 3 - list.length) }, (_, i) => <GhostCard key={`ghost-${i}`} />)}
           </div>
         ) : (
-          <div className="glass grid place-items-center rounded-[1.75rem] px-6 py-16 text-center">
-            <p className="font-display text-xl font-bold">Không có game nào khớp bộ lọc</p>
+          <div className="glass grid place-items-center rounded-[1.75rem] px-6 py-14 text-center">
+            <EmptyArt />
+            <p className="mt-4 font-display text-xl font-bold">Không có game nào khớp bộ lọc</p>
             <p className="mt-2 max-w-[40ch] text-sm text-haze">Thử bỏ bớt tag, đổi sang &ldquo;Hoặc&rdquo; hoặc gõ tên khác.</p>
             {dirty && (
               <button type="button" onClick={clear}

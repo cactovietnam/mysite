@@ -27,7 +27,7 @@ export default function DownloadPanel({ links, title }: { links: Game["links"]; 
   return (
     <>
       <button onClick={() => setOpen(true)}
-              className="group inline-flex items-center gap-3 rounded-full bg-berry py-2.5 pl-7 pr-2.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_-10px_var(--color-berry)] active:scale-95">
+              className="group inline-flex items-center gap-3 rounded-full bg-accent py-2.5 pl-7 pr-2.5 font-semibold text-on-accent shadow-[0_14px_36px_-12px_var(--accent)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_-10px_var(--accent)] active:scale-95">
         Tải xuống
         <span className="grid size-9 place-items-center rounded-full bg-ink/15 transition duration-300 group-hover:translate-y-0.5 group-hover:bg-ink/25">
           <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

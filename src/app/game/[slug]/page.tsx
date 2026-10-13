@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { games } from "@/data/games";
 import { site } from "@/data/site";
-import { fmtDate } from "@/lib/game-ui";
+import { accentStyle, fmtDate } from "@/lib/game-ui";
 import Cover from "@/components/Cover";
 import DownloadPanel from "@/components/DownloadPanel";
 import EngineChip from "@/components/EngineChip";
@@ -38,12 +38,16 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
   ];
 
   return (
-    <main>
+    // --accent / --accent2 / --on-accent của game này: nút tải, glow, viền chip bên trong đều lấy từ đây
+    <main style={accentStyle(game)}>
       {/* Hero: ảnh CHÍNH rõ nét bên phải, bị "che" dần bằng lớp tối từ trái sang và từ dưới lên */}
       <section className="relative isolate -mt-14 flex min-h-[560px] md:min-h-[min(82vh,760px)] items-end overflow-hidden">
-        <div aria-hidden className="absolute inset-0 -z-10">
+        <div aria-hidden className="absolute inset-0 -z-10 bg-cover"
+             style={game.blur ? { backgroundImage: `url("${game.blur}")` } : undefined}>
           <Cover decorative priority src={game.cover} title={game.title} engine={game.engine}
                  className="h-full w-full object-cover object-[60%_20%] md:object-[65%_25%]" />
+          <div className="absolute inset-0"
+               style={{ background: "radial-gradient(55% 70% at 85% 15%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%)" }} />
           <div className="absolute inset-0 hidden md:block"
                style={{ background: "linear-gradient(90deg, #0f0c1a 0%, rgba(15,12,26,0.9) 24%, rgba(15,12,26,0.5) 46%, rgba(15,12,26,0) 72%)" }} />
           <div className="absolute inset-0 md:hidden"
@@ -61,19 +65,19 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           </Link>
 
           {/* Tag tự xuống dòng; quá 10 tag thì gập lại + "Xem thêm" */}
-          <TagList className="mt-7 max-w-3xl" lead={<EngineChip engine={game.engine} className="glass" />} tags={game.tags} />
+          <TagList className="mt-7 max-w-3xl" lead={<EngineChip engine={game.engine} className="glass ring-1 ring-accent/45" />} tags={game.tags} />
 
           <h1 className="mt-5 max-w-[18ch] font-display text-4xl font-extrabold leading-[0.98] tracking-tight text-balance sm:text-6xl md:text-7xl">
             {game.title}
           </h1>
 
-          <p className="mt-4 line-clamp-3 max-w-[58ch] text-base leading-relaxed text-mist/85 sm:text-lg md:line-clamp-none">{game.description}</p>
+          <p className="mt-4 line-clamp-3 max-w-[58ch] text-base leading-relaxed text-white/70 sm:text-lg md:line-clamp-none">{game.description}</p>
 
           <dl className="mt-7 flex max-w-xl flex-wrap gap-x-10 gap-y-4 border-t border-white/15 pt-5">
             {stats.map((s) => (
               <div key={s.label}>
                 <dt className="text-sm text-haze">{s.label}</dt>
-                <dd className="mt-0.5 font-display text-2xl font-bold">{s.value}</dd>
+                <dd className="mt-0.5 font-display text-2xl font-bold tabular-nums">{s.value}</dd>
               </div>
             ))}
           </dl>
@@ -100,7 +104,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
             ].map(([k, v]) => (
               <div key={k} className="flex items-center justify-between gap-4 py-3.5">
                 <dt className="text-sm text-haze">{k}</dt>
-                <dd className="text-right text-sm font-semibold">{v}</dd>
+                <dd className="text-right text-sm font-semibold tabular-nums">{v}</dd>
               </div>
             ))}
           </dl>
@@ -110,7 +114,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
         <div className="order-1 min-w-0 space-y-10 lg:order-2 lg:space-y-12">
           <section>
             <h2 className="mb-3 font-display text-3xl font-bold tracking-tight">Giới thiệu</h2>
-            <p className="max-w-[62ch] whitespace-pre-line text-lg leading-relaxed text-mist/80">{game.description}</p>
+            <p className="max-w-[62ch] whitespace-pre-line text-lg leading-relaxed text-white/70">{game.description}</p>
           </section>
 
           {/* Ảnh BỔ SUNG (tối đa 10): giúp hiểu thêm về game, không gồm ảnh chính */}

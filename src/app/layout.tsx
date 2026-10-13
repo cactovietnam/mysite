@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ReloadReset />
         {site.ageGate.enabled && <AgeGate />}
         <header className="sticky top-4 z-40 px-4">
-          <div className="glass mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full pl-6 pr-2 shadow-lg shadow-black/20">
+          <div className="glass edge mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full pl-6 pr-2 shadow-lg shadow-black/20">
             <Link href="/" className="font-display text-xl font-extrabold tracking-tight">
               {site.name}<span className="text-berry">.</span>
             </Link>

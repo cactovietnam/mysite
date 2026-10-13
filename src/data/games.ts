@@ -13,6 +13,9 @@ export type Game = {
   tags: string[];
   description: string;
   updatedAt: string;
+  accent?: string; // màu nhấn #rrggbb, quan_ly.py tự tính từ ảnh chính (thiếu thì web dùng màu hồng mặc định)
+  accent2?: string;
+  blur?: string; // ảnh mờ 32px dạng data URI: placeholder khi ảnh thật chưa tải xong + nền hero
   links: { label: string; url: string }[];
 };
 

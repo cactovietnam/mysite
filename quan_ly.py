@@ -5,7 +5,7 @@ Chạy:  python quan_ly.py   (đặt file này trong thư mục mysite)
   - Ảnh CHÍNH   (1 ảnh): hiện ngoài trang chủ + làm nền trang game.
   - Ảnh BỔ SUNG (tối đa 10): ảnh trong game để người xem hiểu thêm.
 """
-import colorsys, datetime, hashlib, importlib, io, json, os, re, shutil, subprocess, sys, unicodedata
+import base64, colorsys, datetime, hashlib, importlib, io, json, os, re, shutil, subprocess, sys, unicodedata
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -34,7 +34,7 @@ SITE_DEFAULT = {
     "nav": {"explore": "Khám phá", "discord": "Discord"},
     "home": {"libraryTitle": "Kho game", "featuredBadge": "Mới cập nhật", "featuredButton": "Xem game"},
     "ageGate": {"enabled": True, "remember": "never"},
-    "engines": {"Ren'Py": "#a78bfa", "RPGM": "#2dd4bf", "Unity": "#60a5fa", "Unreal": "#fbbf24"},
+    "engines": {"Ren'Py": "#fb923c", "RPGM": "#2dd4bf", "Unity": "#60a5fa", "Unreal": "#9ca3af"},
 }
 # (đường dẫn trong site.json, nhãn hiển thị, kiểu)
 SITE_FIELDS = [
@@ -285,6 +285,68 @@ def archive_files(files):
         if (DONE / f.name).exists(): f.unlink()
         else: shutil.move(str(f), DONE / f.name)
 
+# ---------- màu nhấn + ảnh mờ (placeholder) từ ảnh chính ----------
+BLUR_W = 32  # ảnh mờ rộng 32px (~400 byte), web phóng lớn lên làm nền và làm placeholder khi ảnh thật chưa tải xong
+
+def _hex(h, l, s):
+    r, g, b = colorsys.hls_to_rgb(h % 1.0, l, s)
+    return "#{:02x}{:02x}{:02x}".format(round(r * 255), round(g * 255), round(b * 255))
+
+def extract_accents(path):
+    """Trả (accent, accent2) dạng '#rrggbb' từ ảnh, hoặc None nếu ảnh gần như đen trắng/xám.
+    Chọn màu rực và chiếm nhiều diện tích; ép độ sáng vào khoảng đọc được trên nền tối (chữ/nút vẫn đạt AA)."""
+    with Image.open(path) as im:
+        im = ImageOps.exif_transpose(im).convert("RGB")
+        im.thumbnail((96, 96))
+        mc = getattr(Image, "Quantize", Image).MEDIANCUT
+        q = im.quantize(colors=12, method=mc)
+        pal = q.getpalette() or []
+        cands = []
+        for count, idx in q.getcolors() or []:
+            r, g, b = pal[idx * 3: idx * 3 + 3]
+            h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+            if l < 0.10 or l > 0.93: continue
+            cands.append((count * (s ** 1.5 + 0.05) * (1 - abs(l - 0.5)), h, s))
+    if not cands: return None
+    cands.sort(reverse=True)
+    _, h1, s1 = cands[0]
+    if s1 < 0.2: return None
+    accent = _hex(h1, 0.64, max(s1, 0.6))
+    # accent2: màu rực nhất có sắc độ lệch >= ~30 độ so với accent; không có thì xoay sắc độ
+    h2, s2 = next(((h, s) for _, h, s in cands[1:] if min(abs(h - h1), 1 - abs(h - h1)) >= 0.08 and s >= 0.2), (h1 + 0.10, s1))
+    return accent, _hex(h2, 0.58, max(s2, 0.5))
+
+def make_blur(path, w=BLUR_W):
+    with Image.open(path) as im:
+        im = ImageOps.exif_transpose(im).convert("RGB")
+        im.thumbnail((w, w))
+        buf = io.BytesIO()
+        im.save(buf, "WEBP", quality=40, method=6)
+    return "data:image/webp;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+def compute_visuals(g):
+    """Ghi accent, accent2, blur vào game từ ảnh chính. Thiếu Pillow/ảnh hỏng: bỏ các field này, web dùng màu mặc định."""
+    before = tuple(g.get(k) for k in ("accent", "accent2", "blur"))
+    for k in ("accent", "accent2", "blur"): g.pop(k, None)
+    p = PUBLIC / g["cover"].lstrip("/") if g.get("cover") else None
+    if Image is not None and p is not None and p.is_file():
+        try:
+            colors = extract_accents(p)
+            if colors: g["accent"], g["accent2"] = colors
+            g["blur"] = make_blur(p)
+        except Exception as e:
+            print(f"  ! Không tính được màu nhấn/ảnh mờ cho '{g['title']}': {type(e).__name__}: {e}")
+    return before != tuple(g.get(k) for k in ("accent", "accent2", "blur"))
+
+def backfill_visuals():
+    """Game cũ (đã có ảnh chính nhưng chưa có ảnh mờ): tính bù một lần khi mở tool."""
+    if Image is None: return
+    games = load(); n = 0
+    for g in games:
+        if g["cover"] and "blur" not in g and compute_visuals(g): n += 1
+    if n:
+        save(games); print(f"  (Đã tính màu nhấn + ảnh mờ cho {n} game. Nhớ đẩy lên Vercel [9])")
+
 def image_wizard(game):
     """Bước 1: ảnh CHÍNH (bìa + nền). Bước 2: ảnh BỔ SUNG (tối đa 10). Trả True nếu có thay đổi."""
     files, skipped = scan_inbox()
@@ -307,6 +369,7 @@ def image_wizard(game):
             url = store(game, cover_file, COVER_W)
             old = game["cover"]
             game["cover"] = url
+            compute_visuals(game)
             game["images"] = [u for u in game["images"] if u != url]
             if old and old != url and old not in game["images"]: remove_file(old)
             used.append(cover_file); changed = True
@@ -369,6 +432,7 @@ def do_manage_images():
         new = g["images"].pop(ni[0] - 1)
         if g["cover"]: g["images"].insert(0, g["cover"])  # ảnh chính cũ xuống làm ảnh bổ sung
         g["cover"] = new
+        compute_visuals(g)
     else:
         for i in sorted(ni, reverse=True): remove_file(g["images"].pop(i - 1))
     save(games); print("  ✓ Đã cập nhật.")
@@ -609,6 +673,7 @@ def main():
     if not DATA.exists():
         sys.exit(f"Không thấy {DATA}. Hãy đặt quan_ly.py trong thư mục mysite.")
     ensure_pillow()
+    backfill_visuals()
     ensure_gitignore()
     if not SITE.exists():
         write_json(SITE, SITE_DEFAULT); print("  (Đã tạo src/data/site.json)")

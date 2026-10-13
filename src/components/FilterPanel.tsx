@@ -1,6 +1,7 @@
 "use client";
 import { useId, useState } from "react";
 import { SORTS, fold, type Filters, type SortKey, type TagInfo } from "@/lib/library-filter";
+import { toneOf } from "@/lib/tag-groups";
 
 type Props = {
   filters: Filters;
@@ -14,6 +15,12 @@ type Props = {
 // Ô nhập dùng chung. Không dùng .glass/.chip ở đây vì chúng là CSS ngoài layer, sẽ đè các class bg-* của Tailwind.
 const field =
   "w-full rounded-xl bg-white/[0.07] px-4 py-2.5 text-sm outline-none ring-1 ring-white/10 placeholder:text-haze focus:bg-white/10 focus-visible:ring-2 focus-visible:ring-berry";
+
+// Chip tag: tô nhạt theo nhóm (đồ họa, lối chơi, bối cảnh...); đã chọn thì đặc màu + glow
+const chipStyle = (c: string, on: boolean): React.CSSProperties =>
+  on
+    ? { background: c, borderColor: c, color: "#0f0c1a", boxShadow: `0 0 16px -2px ${c}` }
+    : { background: `${c}1f`, borderColor: `${c}47`, color: "#efeaff" };
 
 export default function FilterPanel({ filters, tagIndex, dirty, onChange, onClear, className = "" }: Props) {
   const uid = useId();
@@ -72,8 +79,8 @@ export default function FilterPanel({ filters, tagIndex, dirty, onChange, onClea
                 <label className="block cursor-pointer has-[:disabled]:cursor-not-allowed">
                   <input type="checkbox" className="peer sr-only" checked={on}
                          disabled={!on && t.count === 0} onChange={() => toggle(t.label)} />
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 transition peer-disabled:opacity-40 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-berry ${
-                    on ? "bg-berry text-ink ring-berry" : "bg-white/[0.07] text-mist/85 ring-white/10 hover:bg-white/[0.14]"}`}>
+                  <span style={chipStyle(toneOf(t.key), on)}
+                        className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition peer-disabled:opacity-40 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent hover:brightness-125">
                     {t.label}
                     <span className={on ? "text-ink/60" : "text-haze"}>{t.count}</span>
                   </span>

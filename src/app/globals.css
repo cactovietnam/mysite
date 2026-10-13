@@ -6,11 +6,15 @@
   --color-haze: #a59dc9;
   --color-mist: #efeaff;
   --color-berry: #ff6b98;
+  /* màu nhấn theo từng game: đặt --accent/--accent2/--on-accent trên khối bọc (xem accentStyle trong game-ui.ts) */
+  --color-accent: var(--accent);
+  --color-accent2: var(--accent2);
+  --color-on-accent: var(--on-accent);
   --font-display: var(--font-bricolage), system-ui, sans-serif;
   --font-sans: var(--font-bevn), system-ui, sans-serif;
 }
 
-:root { color-scheme: dark; }
+:root { color-scheme: dark; --accent: #ff6b98; --accent2: #7c5cff; --on-accent: #0f0c1a; }
 html { scroll-behavior: smooth; }
 
 body {
@@ -23,11 +27,18 @@ body::before {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background-image:
     radial-gradient(60rem 38rem at 88% -8%, rgba(255, 107, 152, 0.14), transparent 62%),
-    radial-gradient(52rem 40rem at -8% 6%, rgba(124, 92, 255, 0.18), transparent 62%);
+    radial-gradient(52rem 40rem at -8% 6%, rgba(124, 92, 255, 0.18), transparent 62%),
+    radial-gradient(46rem 34rem at 52% 108%, rgba(45, 212, 191, 0.08), transparent 62%);
+}
+
+/* Hạt nhiễu (film grain): SVG feTurbulence 160px lặp lại, 4% độ đặc. Nằm dưới header (z-40) và popup (z-50+), không chặn chuột. */
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: 30; pointer-events: none; opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 ::selection { background: var(--color-berry); color: var(--color-ink); }
-:focus-visible { outline: 2px solid var(--color-berry); outline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* Kính mờ: chỉ làm mờ thật (backdrop-filter) trên máy tính có chuột. Điện thoại dùng nền đặc hơn để cuộn mượt. */
 .glass {
@@ -41,6 +52,15 @@ body::before {
     backdrop-filter: blur(14px);
   }
 }
+/* Viền gradient 1px quanh header: tách khỏi nền mà không cần thêm blur */
+.edge { position: relative; }
+.edge::before {
+  content: ""; position: absolute; inset: 0; padding: 1px; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(115deg, rgba(255,255,255,0.28), rgba(255,255,255,0.04) 35%, rgba(124,92,255,0.38) 70%, rgba(255,107,152,0.5));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+
 /* Huy hiệu nhỏ (tag): không bao giờ làm mờ nền, vì có thể có hàng chục cái */
 .chip {
   background: rgba(30, 24, 56, 0.78);
@@ -52,7 +72,7 @@ body::before {
 @keyframes pop  { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 .anim-rise { animation: rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0ms); }
-.anim-pop  { animation: pop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.anim-pop  { animation: pop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0ms); }
 .anim-fade { animation: fade 0.2s ease both; }
 
 /* Poster nghiêng theo con trỏ chuột */

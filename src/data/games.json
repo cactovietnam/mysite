@@ -1,7 +1,7 @@
 [
   {
     "slug": "above-the-immortalit-realm",
-    "title": "Above the Immortalit Realm",
+    "title": "Above the Immortality Realm",
     "engine": "Unity",
     "version": "0.7.0",
     "sizeGB": 1.4,
@@ -33,6 +33,9 @@
         "label": "",
         "url": "https://gofile.io/d/qlusytMA"
       }
-    ]
+    ],
+    "accent": "#da7c6c",
+    "accent2": "#c9ae5e",
+    "blur": "data:image/webp;base64,UklGRvwAAABXRUJQVlA4IPAAAACQBQCdASogABIAPu1mqk2ppaQiMAgBMB2JQBgfp3BZgtbmmSBXn6KumQlNHG1KF5bngu36AAD+1hpNcwCRY8Wkpe0kRjGBX0cJFd2DyxzVVcl4a7eevgUAdxvVGkjisfjKxlEwh8VuJ8asW9QkzY9MCktXzZo+nvWAlq9T0GirC43rPI24Xpicfd2b3PUiB8GhAlCg4hRlTP1oFKhF+QzUpPGrA5r1tDt7GAsKTEm5jH/d9G9NIuRLtEoKMdpKVvROdpKVvYYVW5uyC0zYZy/77ipaCYkqxLRdHRNGWMQqKsrvyKfFid+QzjPRWVDAAAA="
   }
 ]
