@@ -5,8 +5,10 @@
     "engine": "Ren'Py",
     "version": "1.0.0",
     "sizeGB": 3.8,
-    "cover": "/covers/1.svg",
-    "images": [],
+    "cover": "/covers/game-mau-1/850494e124.webp",
+    "images": [
+      "/covers/game-mau-1/850494e124.webp"
+    ],
     "tags": [
       "Visual Novel",
       "Fantasy"
