@@ -5,10 +5,8 @@
     "engine": "Ren'Py",
     "version": "1.0.0",
     "sizeGB": 3.8,
-    "cover": "/covers/game-mau-1/850494e124.webp",
-    "images": [
-      "/covers/game-mau-1/850494e124.webp"
-    ],
+    "cover": "/covers/1.svg",
+    "images": [],
     "tags": [
       "Visual Novel",
       "Fantasy"
@@ -65,22 +63,22 @@
     ]
   },
   {
-    "slug": "sigma",
-    "title": "sigma",
-    "engine": "RPGM",
+    "slug": "ee",
+    "title": "ee",
+    "engine": "Ren'Py",
     "version": "1.0.0",
-    "sizeGB": 2.0,
+    "sizeGB": 4.0,
     "cover": "",
     "images": [],
     "tags": [
-      "ahegao"
+      "ntr"
     ],
     "description": "sigma",
     "updatedAt": "2026-10-13",
     "links": [
       {
         "label": "",
-        "url": "https://nguyendunh.gofile"
+        "url": "https://dddd.gofile"
       }
     ]
   }
