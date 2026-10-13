@@ -68,8 +68,10 @@
     "engine": "Ren'Py",
     "version": "1.0.0",
     "sizeGB": 4.0,
-    "cover": "",
-    "images": [],
+    "cover": "/covers/ee/3efd2508b0.webp",
+    "images": [
+      "/covers/ee/3efd2508b0.webp"
+    ],
     "tags": [
       "ntr"
     ],
