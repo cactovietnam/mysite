@@ -7,18 +7,10 @@
     "sizeGB": 3.8,
     "cover": "/covers/1.svg",
     "images": [],
-    "tags": [
-      "Visual Novel",
-      "Fantasy"
-    ],
+    "tags": ["Visual Novel", "Fantasy"],
     "description": "Mô tả ngắn về game. Thay nội dung này bằng giới thiệu thật, 2-4 câu là đủ.",
     "updatedAt": "2026-10-12",
-    "links": [
-      {
-        "label": "Hướng dẫn cài đặt",
-        "url": "https://example.com"
-      }
-    ]
+    "links": [{ "label": "Hướng dẫn cài đặt", "url": "https://example.com" }]
   },
   {
     "slug": "game-mau-2",
@@ -28,18 +20,10 @@
     "sizeGB": 1.2,
     "cover": "/covers/2.svg",
     "images": [],
-    "tags": [
-      "RPG",
-      "Phiêu lưu"
-    ],
+    "tags": ["RPG", "Phiêu lưu"],
     "description": "Một game RPG mẫu để thử bố cục lưới và trang chi tiết.",
     "updatedAt": "2026-10-05",
-    "links": [
-      {
-        "label": "Hướng dẫn cài đặt",
-        "url": "https://example.com"
-      }
-    ]
+    "links": [{ "label": "Hướng dẫn cài đặt", "url": "https://example.com" }]
   },
   {
     "slug": "game-mau-3",
@@ -49,32 +33,9 @@
     "sizeGB": 5.4,
     "cover": "/covers/3.svg",
     "images": [],
-    "tags": [
-      "Hành động",
-      "3D"
-    ],
+    "tags": ["Hành động", "3D"],
     "description": "Game Unity mẫu, dùng để kiểm tra tìm kiếm theo engine và tag.",
     "updatedAt": "2026-09-28",
-    "links": [
-      {
-        "label": "Hướng dẫn cài đặt",
-        "url": "https://example.com"
-      }
-    ]
-  },
-  {
-    "slug": "sigma",
-    "title": "SIGMA",
-    "engine": "Ren'Py",
-    "version": "1.0.0",
-    "sizeGB": 3.0,
-    "cover": "/covers/sigma/09f77dbdec.webp",
-    "images": [
-      "/covers/sigma/09f77dbdec.webp"
-    ],
-    "tags": [],
-    "description": "",
-    "updatedAt": "2026-10-13",
-    "links": []
+    "links": [{ "label": "Hướng dẫn cài đặt", "url": "https://example.com" }]
   }
 ]

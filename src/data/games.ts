@@ -3,7 +3,7 @@ import data from "./games.json";
 export type Game = {
   slug: string;
   title: string;
-  engine: "Ren'Py" | "RPGM" | "Unity" | "Unreal";
+  engine: string; // Ren'Py, RPGM, Unity, Unreal, Godot... tùy ý
   version: string;
   sizeGB: number;
   cover: string;
