@@ -17,7 +17,8 @@ export function useModal(open: boolean, onClose?: () => void) {
 
     const focusables = () =>
       Array.from(root?.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input,[tabindex]:not([tabindex="-1"])') ?? []);
-    (root?.querySelector<HTMLElement>("[data-autofocus]") ?? focusables()[0] ?? root)?.focus();
+    const target = root?.hasAttribute("data-focus-root") ? root : root?.querySelector<HTMLElement>("[data-autofocus]") ?? focusables()[0] ?? root;
+    target?.focus();
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && closeRef.current) { e.stopPropagation(); closeRef.current(); return; }

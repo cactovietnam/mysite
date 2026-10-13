@@ -14,7 +14,8 @@
     "featuredButton": "Xem game"
   },
   "ageGate": {
-    "enabled": true
+    "enabled": true,
+    "remember": "never"
   },
   "engines": {
     "Ren'Py": "#a78bfa",

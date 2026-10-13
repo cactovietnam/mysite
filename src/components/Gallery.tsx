@@ -44,7 +44,7 @@ export default function Gallery({ images, title }: { images: string[]; title: st
 
       {cur !== null && (
         <div role="dialog" aria-modal="true" aria-label="Xem ảnh"
-             className="anim-fade fixed inset-0 z-50 flex flex-col bg-ink/95 backdrop-blur-md"
+             className="anim-fade fixed inset-0 z-50 flex flex-col bg-ink/95 md:backdrop-blur-md"
              onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
              onTouchEnd={(e) => {
                if (touchX.current === null || zoom) return;

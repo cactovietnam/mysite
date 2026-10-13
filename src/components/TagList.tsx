@@ -13,12 +13,12 @@ export default function TagList({ tags, lead, limit = 10, className = "" }: {
     <ul className={`flex flex-wrap gap-2 ${className}`}>
       {lead && <li className="max-w-full">{lead}</li>}
       {shown.map((t) => (
-        <li key={t} className="glass max-w-full rounded-full px-3.5 py-1 text-xs font-medium [overflow-wrap:anywhere]">{t}</li>
+        <li key={t} className="chip max-w-full rounded-full px-3.5 py-1 text-xs font-medium [overflow-wrap:anywhere]">{t}</li>
       ))}
       {hidden > 0 && (
         <li>
           <button onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}
-                  className="glass rounded-full px-3.5 py-1 text-xs font-semibold text-berry transition hover:bg-white/15 active:scale-95">
+                  className="chip rounded-full px-3.5 py-1 text-xs font-semibold text-berry transition hover:bg-white/15 active:scale-95">
             {expanded ? "Thu gọn" : <><span aria-hidden>… </span>Xem thêm (+{hidden})</>}
           </button>
         </li>

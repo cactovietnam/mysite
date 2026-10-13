@@ -17,7 +17,7 @@ export default function Hero({ game }: { game: Game }) {
         {/* nền: chính ảnh bìa, làm mờ */}
         <div aria-hidden className="absolute inset-0 -z-10">
           <Cover decorative src={game.cover} title={game.title} engine={game.engine}
-                 className="h-full w-full scale-125 object-cover opacity-55 blur-3xl" />
+                 className="h-full w-full scale-125 object-cover opacity-40 md:opacity-55 md:blur-2xl" />
           <div className="absolute inset-0 bg-gradient-to-r from-plum via-plum/75 to-plum/10" />
         </div>
 

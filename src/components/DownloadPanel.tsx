@@ -37,7 +37,7 @@ export default function DownloadPanel({ links, title }: { links: Game["links"]; 
       </button>
 
       {open && (
-        <div className="anim-fade fixed inset-0 z-50 grid place-items-center bg-ink/75 p-4 backdrop-blur-sm" onClick={() => setOpen(false)}>
+        <div className="anim-fade fixed inset-0 z-50 grid place-items-center bg-ink/75 p-4 md:backdrop-blur-sm" onClick={() => setOpen(false)}>
           <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Link tải ${title}`}
                className="glass anim-pop w-full max-w-md rounded-[2rem] p-5 shadow-2xl shadow-black/50"
                onClick={(e) => e.stopPropagation()}>

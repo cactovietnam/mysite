@@ -33,7 +33,7 @@ SITE_DEFAULT = {
     "footer": "© 2026 MySite",
     "nav": {"explore": "Khám phá", "discord": "Discord"},
     "home": {"libraryTitle": "Kho game", "featuredBadge": "Mới cập nhật", "featuredButton": "Xem game"},
-    "ageGate": {"enabled": True},
+    "ageGate": {"enabled": True, "remember": "never"},
     "engines": {"Ren'Py": "#a78bfa", "RPGM": "#2dd4bf", "Unity": "#60a5fa", "Unreal": "#fbbf24"},
 }
 # (đường dẫn trong site.json, nhãn hiển thị, kiểu)
@@ -49,7 +49,13 @@ SITE_FIELDS = [
     ("home.featuredBadge", "Nhãn game mới cập nhật", "text"),
     ("home.featuredButton", "Chữ nút 'Xem game'", "text"),
     ("ageGate.enabled", "Cổng xác nhận 18+", "bool"),
+    ("ageGate.remember", "Cổng 18+: khi nào hỏi lại (bấm số để đổi)", "choice"),
 ]
+REMEMBER_LABEL = {
+    "never": "Hỏi lại mỗi lần tải lại trang",
+    "session": "Nhớ trong phiên (đóng tab thì hỏi lại)",
+    "forever": "Nhớ mãi trên trình duyệt",
+}
 
 try:
     from PIL import Image, ImageOps
@@ -481,12 +487,16 @@ def do_site():
         print("\n--- CHỮ & LINK TRÊN WEB (Enter = xong) ---")
         for i, (p, label, kind) in enumerate(SITE_FIELDS, 1):
             v = deep_get(site, p)
-            print(f"  {i:>2}. {label}: {('Bật' if v else 'Tắt') if kind == 'bool' else (v or '(trống)')}")
+            shown = ("Bật" if v else "Tắt") if kind == "bool" else REMEMBER_LABEL.get(v, v) if kind == "choice" else (v or "(trống)")
+            print(f"  {i:>2}. {label}: {shown}")
         ni = ask_nums("Số mục cần sửa: ", len(SITE_FIELDS))
         if not ni: return changed
         p, label, kind = SITE_FIELDS[ni[0] - 1]
         if kind == "bool":
             deep_set(site, p, not deep_get(site, p))
+        elif kind == "choice":
+            keys = list(REMEMBER_LABEL); cur = deep_get(site, p)
+            deep_set(site, p, keys[(keys.index(cur) + 1) % len(keys)] if cur in keys else keys[0])
         else:
             v = input(f"  {label} [{deep_get(site, p)}]\n  Giá trị mới (Enter = giữ, '-' = để trống): ").strip()
             if not v: continue
