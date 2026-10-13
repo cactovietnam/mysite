@@ -558,6 +558,11 @@ def do_check():
             p = PUBLIC / u.lstrip("/")
             if not p.is_file() or p.stat().st_size == 0:
                 print(f"  ✗ {g['title']}: thiếu file ảnh {u}"); problems += 1
+            elif Image is not None and p.suffix.lower() != ".gif":
+                try:
+                    with Image.open(p) as im: im.load()  # giải mã thật: bắt ảnh hỏng/cụt mà trình duyệt không hiện được
+                except Exception as e:
+                    print(f"  ✗ {g['title']}: ảnh HỎNG, trình duyệt sẽ không hiện: {u} ({type(e).__name__})"); problems += 1
         for l in g["links"]:
             if not re.match(r"^https?://", l["url"], re.I): print(f"  ✗ {g['title']}: link sai '{l['url']}'"); problems += 1
         if not g["links"]: print(f"  ! {g['title']}: chưa có link tải"); problems += 1
