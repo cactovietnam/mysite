@@ -1,6 +1,6 @@
 import { games } from "@/data/games";
 import Hero from "@/components/Hero";
-import GameCard from "@/components/GameCard";
+import Library from "@/components/Library";
 
 export default function Home() {
   const sorted = [...games].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -9,13 +9,9 @@ export default function Home() {
   return (
     <main>
       {featured && <Hero game={featured} />}
-      <section className="px-6 py-12 md:px-10">
-        <h2 className="mb-6 text-lg font-semibold">Kho game</h2>
-        <div className="grid grid-cols-2 gap-5 md:grid-cols-4 lg:grid-cols-6">
-          {sorted.map((g) => (
-            <GameCard key={g.slug} game={g} />
-          ))}
-        </div>
+      <section id="kho-game" className="mx-auto max-w-6xl scroll-mt-24 px-4 pb-20 pt-16">
+        <h2 className="mb-6 font-display text-3xl font-bold tracking-tight">Kho game</h2>
+        <Library games={sorted} />
       </section>
     </main>
   );

@@ -5,10 +5,8 @@
     "engine": "Ren'Py",
     "version": "1.0.0",
     "sizeGB": 3.8,
-    "cover": "/covers/game-mau-1/a1167f211d.webp",
-    "images": [
-      "/covers/game-mau-1/a1167f211d.webp"
-    ],
+    "cover": "/covers/1.svg",
+    "images": [],
     "tags": [
       "Visual Novel",
       "Fantasy"
@@ -28,10 +26,8 @@
     "engine": "RPGM",
     "version": "0.9.2",
     "sizeGB": 1.2,
-    "cover": "/covers/game-mau-2/13296bac58.webp",
-    "images": [
-      "/covers/game-mau-2/13296bac58.webp"
-    ],
+    "cover": "/covers/2.svg",
+    "images": [],
     "tags": [
       "RPG",
       "Phiêu lưu"
@@ -65,5 +61,20 @@
         "url": "https://example.com"
       }
     ]
+  },
+  {
+    "slug": "sigma",
+    "title": "SIGMA",
+    "engine": "Ren'Py",
+    "version": "1.0.0",
+    "sizeGB": 3.0,
+    "cover": "/covers/sigma/09f77dbdec.webp",
+    "images": [
+      "/covers/sigma/09f77dbdec.webp"
+    ],
+    "tags": [],
+    "description": "",
+    "updatedAt": "2026-10-13",
+    "links": []
   }
 ]
