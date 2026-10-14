@@ -5,12 +5,12 @@
     "engine": "Unity",
     "version": "0.7.0",
     "sizeGB": 1.4,
-    "cover": "/covers/above-the-immortalit-realm/3472953df6.webp",
+    "cover": "/covers/above-the-immortalit-realm/2d221a9d04.webp",
     "images": [
-      "/covers/above-the-immortalit-realm/f5ad7b3b56.webp",
-      "/covers/above-the-immortalit-realm/a2fd578070.webp",
-      "/covers/above-the-immortalit-realm/2a3836b19e.webp",
-      "/covers/above-the-immortalit-realm/16b2c3b5d8.webp"
+      "/covers/above-the-immortalit-realm/0b4d1509a7.webp",
+      "/covers/above-the-immortalit-realm/fd4d4c06de.webp",
+      "/covers/above-the-immortalit-realm/204df97d42.webp",
+      "/covers/above-the-immortalit-realm/f70bb31d85.webp"
     ],
     "tags": [
       "Adult",
@@ -36,8 +36,8 @@
         "url": "https://gofile.io/d/qlusytMA"
       }
     ],
-    "accent": "#da7c6c",
-    "accent2": "#c9ae5e",
-    "blur": "data:image/webp;base64,UklGRvoAAABXRUJQVlA4IO4AAABQBQCdASogABIAPu1iqU2ppaOiMAgBMB2JQBgbg+1gu92d6EdZo72Ogv+NqULy3OgrQIAA/tYaTXMAkWPFpKXtJEYxgV9HCRXdg8sc1VXJeGu3nr4FAHcb1RpI4rH4ysZRMIfFbifGrFvUJM2PTApLV82aPp71gJa0Y6+lnUf38b+GUQqvVdoAOqeU/n9KqUKKr+ytrlJ35A7yrFYMYrPK90vHZVRCZpD7drIrcMdfwrxwpVAmOOCL9FiFVBYXKcUWWZRvBrvNZjMGu6kx5cTpLspqfU/frVgJCiBYOOmCXfkWk/j35LOmLfo+2mAA"
+    "accent": "#da6c7e",
+    "accent2": "#c98d5e",
+    "blur": "data:image/webp;base64,UklGRgABAABXRUJQVlA4IPQAAACwBQCdASogABIAPu1kqU2ppaQiMAgBMB2JYwC7ISACzI7SGBTnjVWUVdyEYB4P5Ahz0acUKwAA/tYaTXMAkWPFpKXtJE7AoEr1gkLud19u9zky8a+fiOpni27qH6a6zo3gHxBQcQF0AaGJbsDvG/hAIqsmOjANYxGXn53ZXlvQvLLCNfCxZRAu/WNmH6q52a9uYptHjHI141US5+ylMC6a+VSr4kobbKFZGZ7xXKnIIQMHrPX+iBFOBzT48rNfMEiuST/BOUyf2Bq/guc9bUyubnhVQ7QAt12fzVntBsLAdtDTgXOF78lqobE78lpJyzTHWAAA"
   }
 ]
