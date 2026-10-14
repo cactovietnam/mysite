@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { site } from "@/data/site";
 import Brand from "./Brand";
+import HomeLink from "./HomeLink";
 
 const link = "rounded-md py-1 text-haze transition hover:text-mist";
 
@@ -20,7 +21,7 @@ export default function Footer() {
           <nav aria-label="Lối tắt">
             <h2 className="font-display text-base font-bold tracking-tight">Lối tắt</h2>
             <ul className="mt-3 flex flex-col">
-              <li><Link href="/" className={link}>{site.nav.explore}</Link></li>
+              <li><HomeLink className={link}>{site.nav.explore}</HomeLink></li>
               <li><Link href="/#kho-game" className={link}>{site.home.libraryTitle}</Link></li>
               <li><Link href="/#huong-dan" className={link}>Cách tải và chơi</Link></li>
             </ul>

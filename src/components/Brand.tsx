@@ -1,10 +1,10 @@
-import Link from "next/link";
+import HomeLink from "./HomeLink";
 import { site } from "@/data/site";
 
 // Logo chữ: ô gradient chứa tay cầm game + tên web chữ hoa, giãn chữ, chuyển màu kem sang hồng.
 export default function Brand() {
   return (
-    <Link href="/" aria-label={site.name} className="group flex shrink-0 items-center gap-2.5">
+    <HomeLink aria-label={site.name} className="group flex shrink-0 items-center gap-2.5">
       <span aria-hidden
             className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-berry to-[#7c5cff] text-ink shadow-[0_6px_20px_-6px_var(--color-berry)] transition duration-300 group-hover:-rotate-6 group-hover:scale-105">
         <svg viewBox="0 0 48 32" className="h-5 w-7" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -16,6 +16,6 @@ export default function Brand() {
       <span className="bg-gradient-to-r from-mist via-mist to-berry bg-clip-text font-display text-xl font-extrabold uppercase tracking-[0.1em] text-transparent">
         {site.name}
       </span>
-    </Link>
+    </HomeLink>
   );
 }
