@@ -32,7 +32,9 @@ SITE_DEFAULT = {
     "discord": "https://discord.gg/",
     "footer": "© 2026 MySite",
     "nav": {"explore": "Khám phá", "discord": "Discord"},
-    "home": {"libraryTitle": "Kho game", "featuredBadge": "Mới cập nhật", "featuredButton": "Xem game"},
+    "home": {"libraryTitle": "Kho game", "featuredBadge": "Mới cập nhật", "featuredButton": "Xem game",
+             "announcement": "Chào mừng bạn đến MySite! Cùng khám phá game và những bản mới cập nhật.",
+             "announcementLabel": "Thông báo"},
     "ageGate": {"enabled": True, "remember": "never"},
     "engines": {"Ren'Py": "#fb923c", "RPGM": "#2dd4bf", "Unity": "#60a5fa", "Unreal": "#9ca3af"},
 }
@@ -48,6 +50,8 @@ SITE_FIELDS = [
     ("home.libraryTitle", "Tiêu đề kho game", "text"),
     ("home.featuredBadge", "Nhãn game mới cập nhật", "text"),
     ("home.featuredButton", "Chữ nút 'Xem game'", "text"),
+    ("home.announcement", "Thanh thông báo dưới slider ('-' = ẩn)", "text"),
+    ("home.announcementLabel", "Nhãn thanh thông báo", "text"),
     ("ageGate.enabled", "Cổng xác nhận 18+", "bool"),
     ("ageGate.remember", "Cổng 18+: khi nào hỏi lại (bấm số để đổi)", "choice"),
 ]

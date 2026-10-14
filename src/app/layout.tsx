@@ -4,7 +4,9 @@ import Link from "next/link";
 import { Bricolage_Grotesque, Be_Vietnam_Pro } from "next/font/google";
 import SearchBox from "@/components/SearchBox";
 import AgeGate from "@/components/AgeGate";
+import NavLinks from "@/components/NavLinks";
 import ReloadReset from "@/components/ReloadReset";
+import { games } from "@/data/games";
 import { site, siteUrl } from "@/data/site";
 
 const display = Bricolage_Grotesque({ subsets: ["latin", "vietnamese"], variable: "--font-bricolage" });
@@ -17,6 +19,8 @@ export const metadata: Metadata = {
   other: site.ageGate.enabled ? { rating: "adult" } : undefined,
 };
 
+const engines = Array.from(new Set(games.map((g) => g.engine))); // tab engine trên menu: tự theo dữ liệu game
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi" className={`${display.variable} ${sans.variable}`}>
@@ -24,18 +28,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ReloadReset />
         {site.ageGate.enabled && <AgeGate />}
         <header className="sticky top-4 z-40 px-4">
-          <div className="glass edge mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full pl-6 pr-2 shadow-lg shadow-black/20">
-            <Link href="/" className="font-display text-xl font-extrabold tracking-tight">
+          <div className="glass edge mx-auto flex h-14 max-w-6xl items-center gap-2 rounded-full pl-6 pr-2 shadow-lg shadow-black/20">
+            <Link href="/" className="shrink-0 font-display text-xl font-extrabold tracking-tight">
               {site.name}<span className="text-berry">.</span>
             </Link>
-            <nav className="flex items-center gap-1.5 text-sm">
-              <Link href="/" className="rounded-full px-4 py-2 text-mist/80 transition hover:bg-white/10 hover:text-mist">{site.nav.explore}</Link>
+            {/* tab ở giữa (từ md trở lên); điện thoại chỉ còn logo + tìm kiếm, lọc engine đã có sẵn trong Kho game */}
+            <NavLinks engines={engines} />
+            <div className="ml-auto flex shrink-0 items-center gap-1.5 md:ml-0">
               {/^https?:\/\//i.test(site.discord) && (
                 <a href={site.discord} target="_blank" rel="noopener noreferrer"
-                   className="hidden rounded-full px-4 py-2 text-mist/80 transition hover:bg-white/10 hover:text-mist sm:block">{site.nav.discord}</a>
+                   className="hidden rounded-full px-4 py-2 text-sm text-mist/80 transition hover:bg-white/10 hover:text-mist lg:block">{site.nav.discord}</a>
               )}
               <SearchBox />
-            </nav>
+            </div>
           </div>
         </header>
 
