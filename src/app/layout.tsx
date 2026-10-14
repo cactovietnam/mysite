@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Be_Vietnam_Pro } from "next/font/google";
 import SearchBox from "@/components/SearchBox";
 import AgeGate from "@/components/AgeGate";
+import BackToTop from "@/components/BackToTop";
 import Brand from "@/components/Brand";
+import Footer from "@/components/Footer";
 import NavLinks from "@/components/NavLinks";
 import ReloadReset from "@/components/ReloadReset";
 import { games } from "@/data/games";
@@ -44,9 +46,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         <div className="flex-1">{children}</div>
 
-        <footer className="mx-auto w-full max-w-6xl px-4 pb-10 pt-4 text-sm text-haze">
-          <div className="border-t border-white/10 pt-6">{site.footer}</div>
-        </footer>
+        <Footer />
+        <BackToTop />
       </body>
     </html>
   );
