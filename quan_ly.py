@@ -4,6 +4,7 @@ Chạy:  python quan_ly.py   (đặt file này trong thư mục mysite)
 Ảnh: bỏ vào thư mục  anh-moi/  rồi chọn trong tool.
   - Ảnh CHÍNH   (1 ảnh): hiện ngoài trang chủ + làm nền trang game.
   - Ảnh BỔ SUNG (tối đa 10): ảnh trong game để người xem hiểu thêm.
+Mọi ảnh thêm vào đều được đóng dấu logo (logo/logo-xanh.png, tự tách nền xanh lá). Chỉnh góc/cỡ ở các hằng WM_*.
 """
 import base64, colorsys, datetime, hashlib, importlib, io, json, os, re, shutil, subprocess, sys, unicodedata
 from pathlib import Path
@@ -17,6 +18,7 @@ COVERS = PUBLIC / "covers"
 INBOX = ROOT / "anh-moi"
 DONE = INBOX / "_da_xu_ly"
 BACKUP = ROOT / "backup"
+LOGO_SRC = ROOT / "logo" / "logo-xanh.png"   # logo nền xanh lá; tool tự tách nền khi dùng
 
 NATIVE = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".avif"}   # trình duyệt đọc được, không cần Pillow
 EXT = NATIVE | {".jfif", ".jpe", ".tif", ".tiff", ".ico"}             # các đuôi này cần Pillow để chuyển
@@ -24,6 +26,14 @@ SKIP_NAMES = {"thumbs.db", "desktop.ini", ".ds_store"}
 MAX_EXTRA = 10      # số ảnh bổ sung tối đa
 COVER_W = 1920      # ảnh chính dùng làm nền nên cho rộng hơn
 EXTRA_W = 1600
+
+# --- đóng dấu logo lên mọi ảnh thêm vào (ảnh gốc trong anh-moi/ không bị sửa) ---
+WM_ON = True          # False = tắt đóng dấu
+WM_CORNER = "br"      # br = dưới phải | bl = dưới trái | tr = trên phải | tl = trên trái
+WM_WIDTH = 0.13       # chiều rộng logo = 13% chiều rộng ảnh
+WM_MIN_W = 96         # nhưng không nhỏ hơn 96 px
+WM_MARGIN = 0.025     # cách mép = 2.5% chiều rộng ảnh
+WM_OPACITY = 0.9
 
 SITE_DEFAULT = {
     "name": "MySite",
@@ -137,7 +147,7 @@ def ask_required(prompt, default=None):
 
 def ask_size(default):
     while True:
-        s = ask("Dung lượng (GB)", default).replace(",", ".")
+        s = str(ask("Dung lượng (GB)", default)).replace(",", ".")
         try: return round(float(s), 2)
         except ValueError: print("  ! Nhập số, vd 3.8")
 
@@ -166,12 +176,60 @@ def ask_engine(default):
         print(f"  (Engine mới '{s}', màu {site['engines'][s]}. Đổi màu: sửa src/data/site.json)")
     return s
 
-def ask_tags(default):
-    s = ask("Tag (cách nhau bằng dấu phẩy)", ", ".join(default))
+# Nhãn nhanh: tag đặc biệt web hiện thành huy hiệu trên thẻ game (khớp không phân biệt hoa/thường/dấu)
+QUICK_TAGS = [
+    ("18+", {"18+"}),
+    ("Việt hóa", {"viet hoa", "viethoa", "vh"}),
+    ("Cheat", {"cheat"}),
+]
+
+def _fold(t):
+    t = unicodedata.normalize("NFD", t.replace("đ", "d").replace("Đ", "D"))
+    return "".join(c for c in t if unicodedata.category(c) != "Mn").lower().strip()
+
+def _split_tags(text):
+    return [x.strip() for x in text.split(",") if x.strip()]
+
+def _dedupe(tags):
     out, seen = [], set()
-    for t in (x.strip() for x in s.split(",")):
-        if t and t.lower() not in seen: seen.add(t.lower()); out.append(t)
+    for t in tags:
+        if t and _fold(t) not in seen: seen.add(_fold(t)); out.append(t)
     return out
+
+def _toggle(tags, label, aliases=None):
+    """Có rồi thì bỏ, chưa có thì thêm. Trả danh sách mới."""
+    keys = aliases or {_fold(label)}
+    if any(_fold(t) in keys for t in tags):
+        return [t for t in tags if _fold(t) not in keys]
+    return tags + [label]
+
+def ask_tags(default):
+    """Sửa tag theo vòng lặp (Enter = xong). Không cần gõ lại cả danh sách khi chỉ muốn thêm/bớt 1-2 tag."""
+    tags = _dedupe(default)
+    presets = [t for t in load_site().get("tagPresets", []) if isinstance(t, str)]
+    while True:
+        have = {_fold(t) for t in tags}
+        quick = "  ".join(f"[{i}] {'✓' if have & al else ' '} {lb}" for i, (lb, al) in enumerate(QUICK_TAGS, 1))
+        print(f"\n  Tag hiện tại: {', '.join(tags) or '(chưa có)'}")
+        print(f"  Nhãn nhanh (bấm số để bật/tắt): {quick}")
+        s = input("  Enter = xong | +tag1, tag2 = thêm | -tag = bớt | p = chọn từ tag gợi ý | hoặc gõ cả danh sách mới\n  > ").strip()
+        if not s: return tags
+        if re.fullmatch(r"[\d\s,]+", s):                      # số: bật/tắt nhãn nhanh
+            for n in re.findall(r"\d+", s):
+                if 1 <= int(n) <= len(QUICK_TAGS):
+                    lb, al = QUICK_TAGS[int(n) - 1]; tags = _toggle(tags, lb, al)
+                else: print(f"  ! Không có nhãn nhanh số {n}")
+        elif s.lower() == "p":
+            if not presets: print("  (Chưa có tag gợi ý. Thêm vào src/data/site.json -> tagPresets)"); continue
+            have = {_fold(t) for t in tags}
+            print("  Tag gợi ý: " + "  ".join(f"[{i}]{'✓' if _fold(t) in have else ''}{t}" for i, t in enumerate(presets, 1)))
+            for i in ask_nums("  Chọn số để bật/tắt (vd: 1 4 6-8; Enter = bỏ qua): ", len(presets)):
+                tags = _toggle(tags, presets[i - 1])
+        elif s[0] == "+": tags = _dedupe(tags + _split_tags(s[1:]))
+        elif s[0] == "-":
+            drop = {_fold(t) for t in _split_tags(s[1:])}
+            tags = [t for t in tags if _fold(t) not in drop]
+        else: tags = _dedupe(_split_tags(s))                    # gõ danh sách đầy đủ = thay toàn bộ
 
 def parse_nums(text, n):
     """'1 2 3' / '1,3' / '3-5' / 'all' -> danh sách chỉ số 1..n, giữ thứ tự, bỏ trùng."""
@@ -249,6 +307,53 @@ def scan_inbox():
         (ok if is_image(p) else skipped).append(p)
     return ok, skipped
 
+_wm = {"img": None, "tried": False}
+
+def _key_green(im):
+    """Tách nền xanh lá: độ trong suốt theo mức xanh lá vượt trội (G - max(R,B)); khử viền xanh ở mép."""
+    from PIL import ImageChops
+    r, g, b = im.convert("RGB").split()
+    spill = ImageChops.subtract(g, ImageChops.lighter(r, b))                 # >0 khi pixel nghiêng về xanh lá
+    alpha = spill.point(lambda v: 255 - max(0, min(255, (v - 25) * 255 // 150)))
+    out = Image.merge("RGB", (r, ImageChops.darker(g, ImageChops.lighter(r, b)), b)).convert("RGBA")
+    out.putalpha(alpha)
+    box = alpha.point(lambda v: 255 if v > 16 else 0).getbbox()
+    return out.crop(box) if box else out
+
+def load_watermark():
+    """Logo đã tách nền (RGBA, cắt sát), nạp một lần. Thiếu file / thiếu Pillow / file hỏng -> None (ảnh vẫn xử lý, không đóng dấu)."""
+    if _wm["tried"]: return _wm["img"]
+    _wm["tried"] = True
+    if Image is None or not WM_ON: return None
+    if not LOGO_SRC.is_file():
+        print(f"  (Chưa có {LOGO_SRC.relative_to(ROOT)} nên ảnh không được đóng dấu logo)"); return None
+    try:
+        with Image.open(LOGO_SRC) as im:
+            im.load()
+            has_alpha = im.mode in ("RGBA", "LA") and im.getchannel("A").getextrema()[0] < 255
+            _wm["img"] = im.convert("RGBA") if has_alpha else _key_green(im)  # logo đã trong suốt thì dùng luôn
+    except Exception as e:
+        print(f"  ! Không đọc được logo: {type(e).__name__}: {e}")
+    return _wm["img"]
+
+def stamp_logo(im):
+    wm = load_watermark()
+    if wm is None: return im
+    w, h = im.size
+    tw = min(max(WM_MIN_W, round(w * WM_WIDTH)), w // 2)       # không to quá nửa ảnh
+    th = max(1, round(wm.height * tw / wm.width))
+    if th > h // 2:
+        th = max(1, h // 2); tw = max(1, round(wm.width * th / wm.height))
+    mark = wm.resize((tw, th), Image.LANCZOS)
+    if WM_OPACITY < 1:
+        mark.putalpha(mark.getchannel("A").point(lambda v: int(v * WM_OPACITY)))
+    m = round(w * WM_MARGIN)
+    x = m if "l" in WM_CORNER else w - tw - m
+    y = m if "t" in WM_CORNER else h - th - m
+    base = im.convert("RGBA")
+    base.alpha_composite(mark, (max(0, x), max(0, y)))
+    return base
+
 def encode(src, max_w):
     """Trả (bytes, đuôi). Có Pillow: xoay đúng EXIF, thu nhỏ, đổi sang WebP. Không có: giữ nguyên (chỉ định dạng web hỗ trợ)."""
     raw = src.read_bytes()
@@ -265,6 +370,8 @@ def encode(src, max_w):
         im = im.convert("RGBA" if alpha else "RGB")
         if im.width > max_w:
             im = im.resize((max_w, max(1, round(im.height * max_w / im.width))), Image.LANCZOS)
+        im = stamp_logo(im)
+        if not alpha and im.mode != "RGB": im = im.convert("RGB")
         buf = io.BytesIO()
         im.save(buf, "WEBP", quality=85, method=4)
         return buf.getvalue(), "webp"
@@ -353,6 +460,7 @@ def backfill_visuals():
 
 def image_wizard(game):
     """Bước 1: ảnh CHÍNH (bìa + nền). Bước 2: ảnh BỔ SUNG (tối đa 10). Trả True nếu có thay đổi."""
+    load_watermark()  # in cảnh báo sớm nếu thiếu logo
     files, skipped = scan_inbox()
     if skipped:
         print("\n  Bỏ qua (không phải ảnh / chưa tải xong): " + ", ".join(p.name for p in skipped))
