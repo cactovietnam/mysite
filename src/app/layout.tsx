@@ -1,9 +1,9 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Bricolage_Grotesque, Be_Vietnam_Pro } from "next/font/google";
 import SearchBox from "@/components/SearchBox";
 import AgeGate from "@/components/AgeGate";
+import Brand from "@/components/Brand";
 import NavLinks from "@/components/NavLinks";
 import ReloadReset from "@/components/ReloadReset";
 import { games } from "@/data/games";
@@ -28,10 +28,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ReloadReset />
         {site.ageGate.enabled && <AgeGate />}
         <header className="sticky top-4 z-40 px-4">
-          <div className="glass edge mx-auto flex h-14 max-w-6xl items-center gap-2 rounded-full pl-6 pr-2 shadow-lg shadow-black/20">
-            <Link href="/" className="shrink-0 font-display text-xl font-extrabold tracking-tight">
-              {site.name}<span className="text-berry">.</span>
-            </Link>
+          <div className="glass edge mx-auto flex h-14 max-w-6xl items-center gap-2 rounded-full pl-3 pr-2 shadow-lg shadow-black/20">
+            <Brand />
             {/* tab ở giữa (từ md trở lên); điện thoại chỉ còn logo + tìm kiếm, lọc engine đã có sẵn trong Kho game */}
             <NavLinks engines={engines} />
             <div className="ml-auto flex shrink-0 items-center gap-1.5 md:ml-0">
