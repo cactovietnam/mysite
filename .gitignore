@@ -44,3 +44,6 @@ next-env.d.ts
 anh-moi/
 backup/
 __pycache__/
+
+# quan_ly.py
+anh-goc/

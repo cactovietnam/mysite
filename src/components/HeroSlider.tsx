@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import type { Game } from "@/data/games";
 import { site } from "@/data/site";
 import { accentStyle, fmtDate } from "@/lib/game-ui";
+import { gameBadges } from "@/lib/game-badges";
 import Cover from "./Cover";
 import EngineChip from "./EngineChip";
+import { AdultChip, PatchChip } from "./GameBadges";
 
 const INTERVAL = 6500;
 const SWIPE_PX = 50;
@@ -23,6 +25,8 @@ export default function HeroSlider({ games }: { games: Game[] }) {
   const touchX = useRef<number | null>(null);
 
   const go = (d: number) => setCur((c) => (c + d + n) % n);
+  // Chỉ gắn <img> cho slide hiện tại và 2 slide kề (khoảng cách vòng tròn <= 1); slide xa chỉ có ảnh mờ làm nền.
+  const near = (i: number) => { const d = Math.abs(i - cur); return Math.min(d, n - d) <= 1; };
 
   // setTimeout (không phải setInterval) và phụ thuộc `cur`: bấm tay xong là đếm lại 6.5s từ đầu.
   useEffect(() => {
@@ -62,6 +66,7 @@ export default function HeroSlider({ games }: { games: Game[] }) {
         <div aria-live={playing ? "off" : "polite"} className="absolute inset-0">
           {games.map((s, i) => {
             const on = i === cur;
+            const { adult, patch } = gameBadges(s.tags);
             return (
               <article
                 key={s.slug}
@@ -74,8 +79,10 @@ export default function HeroSlider({ games }: { games: Game[] }) {
                 {/* nền: ảnh mờ 32px hiện ngay, ảnh thật phủ lên khi tải xong */}
                 <div aria-hidden className="absolute inset-0 bg-cover bg-center"
                      style={s.blur ? { backgroundImage: `url("${s.blur}")` } : undefined}>
-                  <Cover decorative priority={i === 0} src={s.cover} title={s.title} engine={s.engine}
-                         className={`h-full w-full object-cover object-[50%_25%] transition-transform duration-[6500ms] ease-out ${on ? "scale-105" : "scale-100"}`} />
+                  {near(i) && (
+                    <Cover decorative priority={i === 0} src={s.cover} title={s.title} engine={s.engine}
+                           className={`h-full w-full object-cover object-[50%_25%] transition-transform duration-[6500ms] ease-out ${on ? "scale-105" : "scale-100"}`} />
+                  )}
                 </div>
                 <div aria-hidden className="absolute inset-0"
                      style={{ background: "radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%), linear-gradient(0deg, #0f0c1a 3%, rgba(15,12,26,0.82) 36%, rgba(15,12,26,0.2) 72%, rgba(15,12,26,0.35) 100%)" }} />
@@ -97,6 +104,8 @@ export default function HeroSlider({ games }: { games: Game[] }) {
 
                   <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-sm">
                     <EngineChip engine={s.engine} className="glass ring-1 ring-accent/45" />
+                    {patch && <PatchChip patch={patch} />}
+                    {adult && <AdultChip />}
                     <span className="glass rounded-full px-3.5 py-1 tabular-nums">v{s.version}</span>
                     <span className="glass hidden rounded-full px-3.5 py-1 tabular-nums sm:inline">{fmtDate(s.updatedAt)}</span>
                   </div>

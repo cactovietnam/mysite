@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Game } from "@/data/games";
+import { thumbOf, type Game } from "@/data/games";
 import Cover from "./Cover";
 
 // Gợi ý game tương tự: điểm = số tag trùng x2, cùng engine +1. Không có game trùng thì không hiện gì.
@@ -25,7 +25,7 @@ export default function SimilarGames({ current, all }: { current: Game; all: Gam
           <li key={g.slug}>
             <Link href={`/game/${g.slug}`}
                   className="group flex items-center gap-3.5 rounded-[1.5rem] bg-white/[0.05] p-2.5 transition duration-300 hover:translate-x-1 hover:bg-white/[0.1]">
-              <Cover src={g.cover} title={g.title} engine={g.engine}
+              <Cover src={thumbOf(g)} title={g.title} engine={g.engine}
                      className="h-[72px] w-14 shrink-0 rounded-2xl object-cover" />
               <span className="min-w-0">
                 <span className="block truncate font-medium">{g.title}</span>

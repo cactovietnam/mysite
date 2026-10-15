@@ -18,6 +18,7 @@ const subscribe = (cb: () => void) => {
 const getSearch = () => window.location.search;
 
 // Tag gợi ý sửa trong src/data/site.json -> tagPresets (thiếu mục này thì chỉ hiện tag có trong games.json)
+const PAGE = 30; // số game hiện mỗi lượt; bấm "Xem thêm" để hiện tiếp
 const PRESETS = (site as { tagPresets?: string[] }).tagPresets ?? [];
 
 export default function Library({ games }: { games: Game[] }) {
@@ -27,6 +28,10 @@ export default function Library({ games }: { games: Game[] }) {
   const filters = useMemo(() => parseFilters(search, engines, tagIndex), [search, engines, tagIndex]);
   const list = useMemo(() => applyFilters(games, filters), [games, filters]);
   const [panelOpen, setPanelOpen] = useState(false); // chỉ dùng trên điện thoại/tablet
+  // Số game đang hiện gắn với query hiện tại: đổi bộ lọc/sắp xếp thì tự về PAGE mà không cần effect.
+  const [more, setMore] = useState({ key: "", n: PAGE });
+  const limit = more.key === search ? more.n : PAGE;
+  const shown = list.slice(0, limit);
 
   const dirty = filters.engine !== null || filters.q.trim() !== "" || filters.tags.length > 0;
   const badge = filters.tags.length + (filters.q.trim() ? 1 : 0);
@@ -76,15 +81,26 @@ export default function Library({ games }: { games: Game[] }) {
         </div>
 
         {list.length > 0 ? (
-          <div key={filters.engine ?? "all"} className="grid grid-cols-1 gap-x-3 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
-            {list.map((g, i) => (
-              // stagger: thẻ vào lần lượt, trần 8 nhịp để danh sách dài không phải chờ
-              <div key={g.slug} className="anim-pop" style={{ "--d": `${Math.min(i, 8) * 55}ms` } as React.CSSProperties}>
-                <GameCard game={g} />
+          <>
+            <div key={filters.engine ?? "all"} className="grid grid-cols-1 gap-x-3 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
+              {shown.map((g, i) => (
+                // stagger: thẻ vào lần lượt, trần 8 nhịp để danh sách dài không phải chờ
+                <div key={g.slug} className="anim-pop" style={{ "--d": `${Math.min(i, 8) * 55}ms` } as React.CSSProperties}>
+                  <GameCard game={g} />
+                </div>
+              ))}
+              {!dirty && Array.from({ length: Math.max(0, 3 - list.length) }, (_, i) => <GhostCard key={`ghost-${i}`} />)}
+            </div>
+            {list.length > shown.length && (
+              <div className="mt-8 flex flex-col items-center gap-2">
+                <button type="button" onClick={() => setMore({ key: search, n: limit + PAGE })}
+                        className="glass rounded-full px-7 py-3 text-sm font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15 active:scale-95">
+                  Xem thêm ({list.length - shown.length} game)
+                </button>
+                <p className="text-xs text-haze">Đang hiện {shown.length}/{list.length}</p>
               </div>
-            ))}
-            {!dirty && Array.from({ length: Math.max(0, 3 - list.length) }, (_, i) => <GhostCard key={`ghost-${i}`} />)}
-          </div>
+            )}
+          </>
         ) : (
           <div className="glass grid place-items-center rounded-[1.75rem] px-6 py-14 text-center">
             <EmptyArt />

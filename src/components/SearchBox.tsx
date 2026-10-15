@@ -1,19 +1,45 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Fuse from "fuse.js";
+import { useCallback, useEffect, useState } from "react";
+import type Fuse from "fuse.js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { games } from "@/data/games";
 import { useModal } from "@/lib/use-modal";
 import Cover from "./Cover";
+
+// Khớp với src/app/search-index.json/route.ts
+type Item = { slug: string; title: string; engine: string; version: string; tags: string[]; thumb: string };
+type Index = { items: Item[]; fuse: Fuse<Item> };
+
+// Tải chỉ mục + fuse.js đúng một lần, lúc người dùng sắp dùng tìm kiếm (rê chuột / focus / mở). Lỗi thì lần sau thử lại.
+let pending: Promise<Index> | null = null;
+function loadIndex(): Promise<Index> {
+  pending ??= Promise.all([
+    import("fuse.js"),
+    fetch("/search-index.json").then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<Item[]>; }),
+  ]).then(([{ default: FuseCtor }, items]) => ({
+    items,
+    fuse: new FuseCtor(items, { keys: ["title", "tags", "engine"], threshold: 0.35 }),
+  })).catch((e) => { pending = null; throw e; });
+  return pending;
+}
 
 export default function SearchBox() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
-  const fuse = useMemo(() => new Fuse(games, { keys: ["title", "tags", "engine"], threshold: 0.35 }), []);
-  const results = q ? fuse.search(q).slice(0, 6).map((r) => r.item) : games.slice(0, 5);
+  const [index, setIndex] = useState<Index | null>(null);
+  const [failed, setFailed] = useState(false);
+  const results = index ? (q ? index.fuse.search(q).slice(0, 6).map((r) => r.item) : index.items.slice(0, 5)) : [];
+
+  useEffect(() => {
+    if (!open || index) return;
+    let alive = true;
+    setFailed(false);
+    loadIndex().then((x) => { if (alive) setIndex(x); }, () => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, [open, index]);
+  const warm = () => { loadIndex().catch(() => {}); };
 
   const close = useCallback(() => { setOpen(false); setQ(""); setIdx(0); }, []);
   const dialogRef = useModal(open, close); // khóa cuộn, nhốt Tab, Esc đóng, trả focus
@@ -34,7 +60,7 @@ export default function SearchBox() {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} aria-label="Tìm kiếm"
+      <button onClick={() => setOpen(true)} onPointerEnter={warm} onFocus={warm} aria-label="Tìm kiếm"
               className="flex h-10 items-center gap-2.5 rounded-full bg-white/10 px-4 text-sm text-mist/90 transition hover:bg-white/[0.16]">
         <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
           <circle cx="9" cy="9" r="6" /><path d="m14 14 4 4" />
@@ -56,7 +82,7 @@ export default function SearchBox() {
                 <li key={g.slug}>
                   <Link href={`/game/${g.slug}`} onClick={close} onMouseEnter={() => setIdx(i)}
                         className={`flex items-center gap-3.5 rounded-2xl p-2 transition ${i === idx ? "bg-white/10" : ""}`}>
-                    <Cover src={g.cover} title={g.title} engine={g.engine} className="h-14 w-11 shrink-0 rounded-xl object-cover" />
+                    <Cover src={g.thumb} title={g.title} engine={g.engine} className="h-14 w-11 shrink-0 rounded-xl object-cover" />
                     <span className="min-w-0">
                       <span className="block truncate font-medium">{g.title}</span>
                       <span className="block text-xs text-haze">{g.engine}, v{g.version}</span>
@@ -64,7 +90,12 @@ export default function SearchBox() {
                   </Link>
                 </li>
               ))}
-              {q && results.length === 0 && (
+              {open && !index && (
+                <li role="status" className="px-4 py-6 text-center text-sm text-haze">
+                  {failed ? "Không tải được dữ liệu tìm kiếm. Kiểm tra mạng rồi mở lại." : "Đang tải…"}
+                </li>
+              )}
+              {index && q && results.length === 0 && (
                 <li className="px-4 py-6 text-center text-sm text-haze">Không có game nào khớp với &ldquo;{q}&rdquo;. Thử tên khác hoặc một tag.</li>
               )}
             </ul>

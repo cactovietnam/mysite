@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { games } from "@/data/games";
-import { site } from "@/data/site";
+import { site, siteUrl } from "@/data/site";
 import { accentStyle, fmtDate } from "@/lib/game-ui";
+import { gameBadges, isBadgeTag } from "@/lib/game-badges";
 import Cover from "@/components/Cover";
 import DownloadPanel from "@/components/DownloadPanel";
 import EngineChip from "@/components/EngineChip";
+import { AdultChip, PatchChip } from "@/components/GameBadges";
 import Gallery from "@/components/Gallery";
 import SimilarGames from "@/components/SimilarGames";
 import TagList from "@/components/TagList";
@@ -22,7 +24,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: game.title,
     description: game.description,
-    openGraph: game.cover ? { images: [game.cover] } : undefined,
+    alternates: { canonical: `/game/${game.slug}` },
+    openGraph: { title: game.title, description: game.description, type: "website", images: game.cover ? [game.cover] : undefined },
   };
 }
 
@@ -30,6 +33,22 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const game = games.find((g) => g.slug === slug);
   if (!game) notFound();
+
+  const { adult, patch } = gameBadges(game.tags);
+  const abs = (path: string) => (siteUrl && path ? new URL(path, siteUrl).href : undefined);
+  // JSON-LD cho Google. JSON.stringify tự bỏ trường undefined; thay "<" để chuỗi không thể đóng thẻ <script> sớm.
+  const jsonLd = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "VideoGame",
+    name: game.title,
+    description: game.description || undefined,
+    url: abs(`/game/${game.slug}`),
+    image: abs(game.cover),
+    softwareVersion: game.version,
+    fileSize: `${game.sizeGB} GB`,
+    dateModified: game.updatedAt,
+    keywords: game.tags.join(", ") || undefined,
+  }).replace(/</g, "\\u003c");
 
   const stats = [
     { label: "Phiên bản", value: game.version },
@@ -40,6 +59,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
   return (
     // --accent / --accent2 / --on-accent của game này: nút tải, glow, viền chip bên trong đều lấy từ đây
     <main style={accentStyle(game)}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       {/* Hero: ảnh CHÍNH rõ nét bên phải, bị "che" dần bằng lớp tối từ trái sang và từ dưới lên */}
       <section className="relative isolate -mt-14 flex min-h-[560px] md:min-h-[min(82vh,760px)] items-end overflow-hidden">
         <div aria-hidden className="absolute inset-0 -z-10 bg-cover"
@@ -65,7 +85,13 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           </Link>
 
           {/* Tag tự xuống dòng; quá 10 tag thì gập lại + "Xem thêm" */}
-          <TagList className="mt-7 max-w-3xl" lead={<EngineChip engine={game.engine} className="glass ring-1 ring-accent/45" />} tags={game.tags} />
+          <TagList className="mt-7 max-w-3xl" lead={
+            <span className="inline-flex flex-wrap items-center gap-1.5">
+              <EngineChip engine={game.engine} className="glass ring-1 ring-accent/45" />
+              {patch && <PatchChip patch={patch} />}
+              {adult && <AdultChip />}
+            </span>
+          } tags={game.tags.filter((t) => !isBadgeTag(t))} />
 
           <h1 className="mt-5 max-w-[18ch] font-display text-4xl font-extrabold leading-[0.98] tracking-tight text-balance sm:text-6xl md:text-7xl">
             {game.title}

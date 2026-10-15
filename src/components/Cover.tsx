@@ -38,6 +38,7 @@ export default function Cover({ src, title, engine, className = "", priority, de
       alt={decorative ? "" : title}
       aria-hidden={decorative || undefined}
       loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
       decoding="async"
       onError={() => setFailed(true)}
       className={className}

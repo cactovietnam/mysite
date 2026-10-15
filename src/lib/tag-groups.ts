@@ -5,6 +5,7 @@ import { fold } from "./library-filter";
 export type TagGroup = { id: string; label: string; color: string; tags: string[] };
 
 export const TAG_GROUPS: TagGroup[] = [
+  { id: "status", label: "Trạng thái", color: "#fbbf24", tags: ["Việt hóa", "Cheat", "18+"] },
   { id: "visual", label: "Đồ họa", color: "#60a5fa", tags: ["2DCG", "3DCG", "Animation", "Anime", "Pixel Art"] },
   { id: "gameplay", label: "Lối chơi", color: "#2dd4bf",
     tags: ["Visual Novel", "RPG", "Simulation", "Management", "Adventure", "Puzzle", "Sandbox", "Action", "Turn-Based", "Multiple Endings"] },

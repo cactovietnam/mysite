@@ -1,9 +1,10 @@
 import Link from "next/link";
-import type { Game } from "@/data/games";
+import { thumbOf, type Game } from "@/data/games";
 import { engineColor, fmtDate, isHex } from "@/lib/game-ui";
 import { gameBadges, isBadgeTag } from "@/lib/game-badges";
 import Cover from "./Cover";
 import EngineChip from "./EngineChip";
+import { PatchChip } from "./GameBadges";
 import NewBadge from "./NewBadge";
 
 export default function GameCard({ game }: { game: Game }) {
@@ -18,22 +19,14 @@ export default function GameCard({ game }: { game: Game }) {
       {/* ảnh mờ làm nền: hiện ngay trong lúc ảnh thật còn đang tải */}
       <div className="relative aspect-video overflow-hidden rounded-[1.5rem] bg-plum bg-cover ring-1 ring-white/10 transition-shadow duration-500 group-hover:shadow-[0_28px_56px_-20px_var(--c)] group-focus-visible:shadow-[0_28px_56px_-20px_var(--c)]"
            style={frame}>
-        <Cover src={game.cover} title={game.title} engine={game.engine}
+        <Cover src={thumbOf(game)} title={game.title} engine={game.engine}
                className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
 
         <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <EngineChip engine={game.engine} tint className="glass" />
-            {patch && (
-              <span className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold text-white"
-                    style={{
-                      background: `linear-gradient(90deg, ${patch.from}59, ${patch.to}59), rgba(15,12,26,0.74)`,
-                      borderColor: `${patch.from}99`,
-                    }}>
-                {patch.label}
-              </span>
-            )}
+            {patch && <PatchChip patch={patch} />}
           </div>
           <NewBadge updatedAt={game.updatedAt} />
         </div>

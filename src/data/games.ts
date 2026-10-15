@@ -15,9 +15,12 @@ export type Game = {
   updatedAt: string;
   accent?: string; // màu nhấn #rrggbb, quan_ly.py tự tính từ ảnh chính (thiếu thì web dùng màu hồng mặc định)
   accent2?: string;
+  thumb?: string; // ảnh chính bản nhỏ 640px (quan_ly.py sinh): thẻ game, tìm kiếm, game tương tự. Thiếu thì dùng cover
   blur?: string; // ảnh mờ 32px dạng data URI: placeholder khi ảnh thật chưa tải xong + nền hero
   links: { label: string; url: string }[];
 };
+
+export const thumbOf = (g: Pick<Game, "thumb" | "cover">) => g.thumb || g.cover;
 
 type Raw = Omit<Game, "cover" | "images" | "tags" | "links"> &
   Partial<Pick<Game, "cover" | "images" | "tags" | "links">>;

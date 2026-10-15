@@ -18,6 +18,7 @@ COVERS = PUBLIC / "covers"
 INBOX = ROOT / "anh-moi"
 DONE = INBOX / "_da_xu_ly"
 BACKUP = ROOT / "backup"
+ANH_GOC = ROOT / "anh-goc"                    # ảnh gốc theo từng game (không đẩy lên git): đổi logo/cỡ sau này vẫn đóng dấu lại được
 LOGO_SRC = ROOT / "logo" / "logo-xanh.png"   # logo nền xanh lá; tool tự tách nền khi dùng
 
 NATIVE = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".avif"}   # trình duyệt đọc được, không cần Pillow
@@ -26,6 +27,7 @@ SKIP_NAMES = {"thumbs.db", "desktop.ini", ".ds_store"}
 MAX_EXTRA = 10      # số ảnh bổ sung tối đa
 COVER_W = 1920      # ảnh chính dùng làm nền nên cho rộng hơn
 EXTRA_W = 1600
+THUMB_W = 640       # ảnh nhỏ cho thẻ game / ô tìm kiếm / game tương tự (hiện ~380px nên 640 đủ nét cho màn 1.5x-2x)
 
 # --- đóng dấu logo lên mọi ảnh thêm vào (ảnh gốc trong anh-moi/ không bị sửa) ---
 WM_ON = True          # False = tắt đóng dấu
@@ -384,17 +386,35 @@ def store(game, src, max_w):
     path = folder / name
     path.write_bytes(data)
     if not path.is_file() or path.stat().st_size == 0: raise OSError("ghi file thất bại")
+    keep_original(src, game["slug"], path.stem)
     return f"/covers/{game['slug']}/{name}"
+
+_kept = {}  # file trong anh-moi/ -> bản đã lưu ở anh-goc/ (để archive_files biết bản gốc đã an toàn)
+
+def keep_original(src, slug, stem):
+    """Chép ảnh gốc vào anh-goc/<slug>/<tên file web>.<đuôi gốc>. Tên khớp tên file web nên tra ngược được. Lỗi thì chỉ cảnh báo."""
+    try:
+        dest = ANH_GOC / slug / (stem + (src.suffix.lower() or ".bin"))
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        if dest.stat().st_size == src.stat().st_size: _kept[src] = dest
+    except OSError as e:
+        print(f"  ! Không lưu được ảnh gốc {src.name}: {e}")
 
 def remove_file(url):
     p = (PUBLIC / url.lstrip("/")).resolve()
     if COVERS.resolve() in p.parents: p.unlink(missing_ok=True)  # chỉ xóa trong public/covers
 
 def archive_files(files):
+    """Ảnh đã có bản ở anh-goc/ thì dọn khỏi anh-moi/. Chưa có thì chuyển sang _da_xu_ly/ (trùng tên thì đánh số, không xóa đè)."""
     DONE.mkdir(exist_ok=True)
     for f in files:
-        if (DONE / f.name).exists(): f.unlink()
-        else: shutil.move(str(f), DONE / f.name)
+        kept = _kept.pop(f, None)
+        if kept is not None and kept.is_file(): f.unlink(missing_ok=True); continue
+        dest, n = DONE / f.name, 2
+        while dest.exists():
+            dest = DONE / f"{f.stem}-{n}{f.suffix}"; n += 1
+        shutil.move(str(f), dest)
 
 # ---------- màu nhấn + ảnh mờ (placeholder) từ ảnh chính ----------
 BLUR_W = 32  # ảnh mờ rộng 32px (~400 byte), web phóng lớn lên làm nền và làm placeholder khi ảnh thật chưa tải xong
@@ -449,14 +469,39 @@ def compute_visuals(g):
             print(f"  ! Không tính được màu nhấn/ảnh mờ cho '{g['title']}': {type(e).__name__}: {e}")
     return before != tuple(g.get(k) for k in ("accent", "accent2", "blur"))
 
+def make_thumb(g):
+    """Sinh ảnh nhỏ THUMB_W px từ ảnh chính (đã đóng dấu, nên không đóng dấu lại). Ghi g['thumb'].
+    Ảnh chính không rộng hơn THUMB_W / GIF / thiếu Pillow: không có thumb, web dùng thẳng ảnh chính. Trả True nếu field đổi."""
+    old = g.get("thumb", ""); g.pop("thumb", None)
+    cover = g.get("cover") or ""
+    src = PUBLIC / cover.lstrip("/") if cover else None
+    if Image is not None and src is not None and src.is_file() and src.suffix.lower() != ".gif":
+        try:
+            with Image.open(src) as im:
+                if im.width > THUMB_W:
+                    im.load()
+                    im = ImageOps.exif_transpose(im)
+                    im = im.convert("RGBA" if "A" in im.getbands() else "RGB")
+                    im = im.resize((THUMB_W, max(1, round(im.height * THUMB_W / im.width))), Image.LANCZOS)
+                    dest = src.with_name(src.stem + "_t.webp")
+                    buf = io.BytesIO(); im.save(buf, "WEBP", quality=80, method=4)
+                    dest.write_bytes(buf.getvalue())
+                    g["thumb"] = f"/covers/{g['slug']}/{dest.name}"
+        except Exception as e:
+            print(f"  ! Không tạo được ảnh nhỏ cho '{g['title']}': {type(e).__name__}: {e}")
+    new = g.get("thumb", "")
+    if old and old != new: remove_file(old)
+    return old != new
+
 def backfill_visuals():
     """Game cũ (đã có ảnh chính nhưng chưa có ảnh mờ): tính bù một lần khi mở tool."""
     if Image is None: return
     games = load(); n = 0
     for g in games:
         if g["cover"] and "blur" not in g and compute_visuals(g): n += 1
-    if n:
-        save(games); print(f"  (Đã tính màu nhấn + ảnh mờ cho {n} game. Nhớ đẩy lên Vercel [9])")
+    t = sum(1 for g in games if g["cover"] and "thumb" not in g and make_thumb(g))
+    if n or t:
+        save(games); print(f"  (Đã tính màu nhấn/ảnh mờ cho {n} game, tạo ảnh nhỏ cho {t} game. Nhớ đẩy lên Vercel [9])")
 
 def image_wizard(game):
     """Bước 1: ảnh CHÍNH (bìa + nền). Bước 2: ảnh BỔ SUNG (tối đa 10). Trả True nếu có thay đổi."""
@@ -481,7 +526,7 @@ def image_wizard(game):
             url = store(game, cover_file, COVER_W)
             old = game["cover"]
             game["cover"] = url
-            compute_visuals(game)
+            compute_visuals(game); make_thumb(game)
             game["images"] = [u for u in game["images"] if u != url]
             if old and old != url and old not in game["images"]: remove_file(old)
             used.append(cover_file); changed = True
@@ -544,7 +589,7 @@ def do_manage_images():
         new = g["images"].pop(ni[0] - 1)
         if g["cover"]: g["images"].insert(0, g["cover"])  # ảnh chính cũ xuống làm ảnh bổ sung
         g["cover"] = new
-        compute_visuals(g)
+        compute_visuals(g); make_thumb(g)
     else:
         for i in sorted(ni, reverse=True): remove_file(g["images"].pop(i - 1))
     save(games); print("  ✓ Đã cập nhật.")
@@ -696,12 +741,12 @@ def ensure_gitignore():
     gi = ROOT / ".gitignore"
     text = gi.read_text(encoding="utf-8") if gi.exists() else ""
     have = {l.strip() for l in text.splitlines()}
-    add = [x for x in ("anh-moi/", "backup/", "__pycache__/") if x not in have]
+    add = [x for x in ("anh-moi/", "anh-goc/", "backup/", "__pycache__/") if x not in have]
     if add:
         gi.write_text(text.rstrip("\n") + ("\n" if text else "") + "\n# quan_ly.py\n" + "\n".join(add) + "\n", encoding="utf-8")
         print(f"  (Đã thêm vào .gitignore: {', '.join(add)})")
-    if has_git() and run("git", "ls-files", "--", "anh-moi", "backup").stdout.strip():
-        run("git", "rm", "-r", "--cached", "-q", "--", "anh-moi", "backup")
+    if has_git() and run("git", "ls-files", "--", "anh-moi", "anh-goc", "backup").stdout.strip():
+        run("git", "rm", "-r", "--cached", "-q", "--", "anh-moi", "anh-goc", "backup")
         print("  (Đã gỡ anh-moi/ và backup/ khỏi git; chúng vẫn nằm trên máy bạn)")
 
 def do_push():
@@ -739,7 +784,7 @@ def do_check():
     games = load(); problems = 0; referenced = set(); urls = []
     for g in games:
         if not g["cover"]: print(f"  ! {g['title']}: chưa có ảnh chính"); problems += 1
-        for u in ([g["cover"]] if g["cover"] else []) + g["images"]:
+        for u in ([g["cover"]] if g["cover"] else []) + ([g["thumb"]] if g.get("thumb") else []) + g["images"]:
             referenced.add(u); urls.append(u)
             p = PUBLIC / u.lstrip("/")
             if not p.is_file() or p.stat().st_size == 0:
