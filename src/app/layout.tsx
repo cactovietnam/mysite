@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Be_Vietnam_Pro } from "next/font/google";
 import SearchBox from "@/components/SearchBox";
+import AccountMenu from "@/components/AccountMenu";
 import AgeGate from "@/components/AgeGate";
 import BackToTop from "@/components/BackToTop";
 import Brand from "@/components/Brand";
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                    className="hidden rounded-full px-4 py-2 text-sm text-mist/80 transition hover:bg-white/10 hover:text-mist lg:block">{site.nav.discord}</a>
               )}
               <SearchBox />
+              <AccountMenu />
             </div>
           </div>
         </header>
