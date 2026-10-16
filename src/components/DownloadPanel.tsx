@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useModal } from "@/lib/use-modal";
 import type { Game } from "@/data/games";
 import { providerOf } from "@/lib/game-ui";
@@ -54,7 +55,7 @@ export default function DownloadPanel({ links, title }: { links: Game["links"]; 
         </span>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div className="anim-fade fixed inset-0 z-50 grid place-items-center bg-ink/75 p-4 md:backdrop-blur-sm" onClick={() => setOpen(false)}>
           <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Link tải ${title}`}
                className="glass anim-pop w-full max-w-md rounded-[2rem] p-5 shadow-2xl shadow-black/50"
@@ -92,7 +93,8 @@ export default function DownloadPanel({ links, title }: { links: Game["links"]; 
               })}
             </ul>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

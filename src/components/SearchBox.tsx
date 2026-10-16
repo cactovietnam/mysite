@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type Fuse from "fuse.js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -69,7 +70,7 @@ export default function SearchBox() {
         <kbd className="hidden rounded-md bg-white/10 px-1.5 py-0.5 font-sans text-[11px] text-haze md:inline">Ctrl K</kbd>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div className="anim-fade fixed inset-0 z-50 flex items-start justify-center bg-ink/70 px-4 pt-[12vh] md:backdrop-blur-sm" onClick={close}>
           <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Tìm game"
                className="glass anim-pop w-full max-w-xl rounded-[1.75rem] p-3 shadow-2xl shadow-black/50 outline-none"
@@ -100,7 +101,8 @@ export default function SearchBox() {
               )}
             </ul>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
