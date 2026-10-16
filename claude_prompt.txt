@@ -1,0 +1,284 @@
+﻿
+
+=== FILE: src\app\error.tsx ===
+
+
+
+=== FILE: src\app\globals.css ===
+
+
+
+=== FILE: src\app\layout.tsx ===
+
+
+
+=== FILE: src\app\not-found.tsx ===
+
+
+
+=== FILE: src\app\page.tsx ===
+
+
+
+=== FILE: src\app\robots.ts ===
+
+
+
+=== FILE: src\app\sitemap.ts ===
+
+
+
+=== FILE: src\app\dang-ky\page.tsx ===
+
+
+
+=== FILE: src\app\dang-nhap\page.tsx ===
+
+
+
+=== FILE: src\app\dat-lai-mat-khau\page.tsx ===
+
+
+
+=== FILE: src\app\dieu-khoan\page.tsx ===
+
+
+
+=== FILE: src\app\game\[slug]\page.tsx ===
+
+
+
+=== FILE: src\app\gui-lai-xac-nhan\page.tsx ===
+
+
+
+=== FILE: src\app\quen-mat-khau\page.tsx ===
+
+
+
+=== FILE: src\app\search-index.json\route.ts ===
+
+
+
+=== FILE: src\app\xac-nhan\page.tsx ===
+
+
+
+=== FILE: src\components\AccountMenu.tsx ===
+
+
+
+=== FILE: src\components\AgeGate.tsx ===
+
+
+
+=== FILE: src\components\Announcement.tsx ===
+
+
+
+=== FILE: src\components\BackToTop.tsx ===
+
+
+
+=== FILE: src\components\Brand.tsx ===
+
+
+
+=== FILE: src\components\Cover.tsx ===
+
+
+
+=== FILE: src\components\DownloadPanel.tsx ===
+
+
+
+=== FILE: src\components\EngineChip.tsx ===
+
+
+
+=== FILE: src\components\FilterPanel.tsx ===
+
+
+
+=== FILE: src\components\Footer.tsx ===
+
+
+
+=== FILE: src\components\Gallery.tsx ===
+
+
+
+=== FILE: src\components\GameBadges.tsx ===
+
+
+
+=== FILE: src\components\GameCard.tsx ===
+
+
+
+=== FILE: src\components\Hero.tsx ===
+
+
+
+=== FILE: src\components\HeroCarousel.tsx ===
+
+
+
+=== FILE: src\components\HeroSlider.tsx ===
+
+
+
+=== FILE: src\components\HomeLink.tsx ===
+
+
+
+=== FILE: src\components\HowTo.tsx ===
+
+
+
+=== FILE: src\components\Library.tsx ===
+
+
+
+=== FILE: src\components\LibraryArt.tsx ===
+
+
+
+=== FILE: src\components\NavLinks.tsx ===
+
+
+
+=== FILE: src\components\NavTabs.tsx ===
+
+
+
+=== FILE: src\components\NewBadge.tsx ===
+
+
+
+=== FILE: src\components\NoticeBar.tsx ===
+
+
+
+=== FILE: src\components\RandomGame.tsx ===
+
+
+
+=== FILE: src\components\ReloadReset.tsx ===
+
+
+
+=== FILE: src\components\SearchBox.tsx ===
+
+
+
+=== FILE: src\components\SimilarGames.tsx ===
+
+
+
+=== FILE: src\components\StatsStrip.tsx ===
+
+
+
+=== FILE: src\components\TagList.tsx ===
+
+
+
+=== FILE: src\components\Tilt.tsx ===
+
+
+
+=== FILE: src\components\auth\AuthGate.tsx ===
+
+
+
+=== FILE: src\components\auth\AuthShell.tsx ===
+
+
+
+=== FILE: src\components\auth\ConfirmStatus.tsx ===
+
+
+
+=== FILE: src\components\auth\EmailForm.tsx ===
+
+
+
+=== FILE: src\components\auth\LoginForm.tsx ===
+
+
+
+=== FILE: src\components\auth\PasswordField.tsx ===
+
+
+
+=== FILE: src\components\auth\ResetPasswordForm.tsx ===
+
+
+
+=== FILE: src\components\auth\SignupForm.tsx ===
+
+
+
+=== FILE: src\components\auth\Turnstile.tsx ===
+
+
+
+=== FILE: src\components\auth\ui.ts ===
+
+
+
+=== FILE: src\data\games.json ===
+
+
+
+=== FILE: src\data\games.ts ===
+
+
+
+=== FILE: src\data\site.json ===
+
+
+
+=== FILE: src\data\site.ts ===
+
+
+
+=== FILE: src\lib\auth-errors.ts ===
+
+
+
+=== FILE: src\lib\auth-store.ts ===
+
+
+
+=== FILE: src\lib\auth-validate.ts ===
+
+
+
+=== FILE: src\lib\game-badges.ts ===
+
+
+
+=== FILE: src\lib\game-ui.ts ===
+
+
+
+=== FILE: src\lib\library-filter.ts ===
+
+
+
+=== FILE: src\lib\soft-nav.ts ===
+
+
+
+=== FILE: src\lib\supabase.ts ===
+
+
+
+=== FILE: src\lib\tag-groups.ts ===
+
+
+
+=== FILE: src\lib\use-modal.ts ===
+

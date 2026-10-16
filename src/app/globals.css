@@ -75,18 +75,6 @@ body::after {
 .anim-pop  { animation: pop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0ms); }
 .anim-fade { animation: fade 0.2s ease both; }
 
-/* Poster nghiêng theo con trỏ chuột */
-.tilt {
-  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-  transition: transform 0.3s ease-out;
-  will-change: transform;
-}
-.tilt-glare {
-  position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  background: radial-gradient(circle at var(--gx, 30%) var(--gy, 0%), rgba(255,255,255,0.22), transparent 55%);
-  transition: background-position 0.3s;
-}
-
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {
@@ -94,5 +82,4 @@ body::after {
     animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
   }
-  .tilt { transform: none !important; }
 }

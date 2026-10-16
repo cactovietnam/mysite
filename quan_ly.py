@@ -49,6 +49,12 @@ SITE_DEFAULT = {
              "announcementLabel": "Thông báo"},
     "ageGate": {"enabled": True, "remember": "never"},
     "engines": {"Ren'Py": "#fb923c", "RPGM": "#2dd4bf", "Unity": "#60a5fa", "Unreal": "#9ca3af"},
+    "tagPresets": ["2DCG", "3DCG", "Animation", "Anime", "Visual Novel", "RPG", "Simulation", "Management", "Adventure",
+                   "Puzzle", "Sandbox", "Action", "Turn-Based", "Fantasy", "Horror", "Comedy", "School Life",
+                   "Slice of Life", "Romance", "Harem", "Vanilla", "Netori", "Cheating", "Corruption", "Femdom",
+                   "BDSM", "Futa", "Yuri", "Big Tits", "MILF", "Monster Girl", "Tentacles", "Mind Control",
+                   "Blackmail", "Group Sex", "Male Protagonist", "Female Protagonist", "Multiple Endings",
+                   "Adult", "Eroge", "Erotic", "NSFW", "No AI"],
 }
 # (đường dẫn trong site.json, nhãn hiển thị, kiểu)
 SITE_FIELDS = [
