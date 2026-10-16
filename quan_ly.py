@@ -44,7 +44,7 @@ SITE_DEFAULT = {
     "discord": "https://discord.gg/",
     "footer": "© 2026 MySite",
     "nav": {"explore": "Khám phá", "discord": "Discord"},
-    "home": {"libraryTitle": "Kho game", "featuredBadge": "Mới cập nhật", "featuredButton": "Xem game",
+    "home": {"libraryTitle": "Kho game", "featuredBadge": "Mới cập nhật", "featuredButton": "Xem game", "sliderSeconds": 6,
              "announcement": "Chào mừng bạn đến MySite! Cùng khám phá game và những bản mới cập nhật.",
              "announcementLabel": "Thông báo"},
     "ageGate": {"enabled": True, "remember": "never"},
@@ -68,6 +68,7 @@ SITE_FIELDS = [
     ("home.libraryTitle", "Tiêu đề kho game", "text"),
     ("home.featuredBadge", "Nhãn game mới cập nhật", "text"),
     ("home.featuredButton", "Chữ nút 'Xem game'", "text"),
+    ("home.sliderSeconds", "Slider: số giây tự chuyển game (2-30)", "seconds"),
     ("home.announcement", "Thanh thông báo dưới slider ('-' = ẩn)", "text"),
     ("home.announcementLabel", "Nhãn thanh thông báo", "text"),
     ("ageGate.enabled", "Cổng xác nhận 18+", "bool"),
@@ -724,6 +725,13 @@ def do_site():
         elif kind == "choice":
             keys = list(REMEMBER_LABEL); cur = deep_get(site, p)
             deep_set(site, p, keys[(keys.index(cur) + 1) % len(keys)] if cur in keys else keys[0])
+        elif kind == "seconds":
+            v = input(f"  {label} [{deep_get(site, p)}]\n  Số giây mới (Enter = giữ): ").strip().replace(",", ".")
+            if not v: continue
+            try: sec = float(v)
+            except ValueError: print("  ! Nhập số, vd 6 hoặc 4.5"); continue
+            if not 2 <= sec <= 30: print("  ! Chỉ nhận 2-30 giây."); continue
+            deep_set(site, p, int(sec) if sec == int(sec) else sec)
         else:
             v = input(f"  {label} [{deep_get(site, p)}]\n  Giá trị mới (Enter = giữ, '-' = để trống): ").strip()
             if not v: continue

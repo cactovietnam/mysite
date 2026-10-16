@@ -9,14 +9,16 @@ import Cover from "./Cover";
 import EngineChip from "./EngineChip";
 import { AdultChip, PatchChip } from "./GameBadges";
 
-const INTERVAL = 6500;
+// Số giây tự chuyển slide: site.json -> home.sliderSeconds (sửa ở quan_ly.py mục 7). Kẹp 2-30 giây, sai/thiếu thì dùng 6.
+const rawSec = Number((site.home as { sliderSeconds?: unknown }).sliderSeconds);
+const INTERVAL = (Number.isFinite(rawSec) ? Math.min(30, Math.max(2, rawSec)) : 6) * 1000;
 const SWIPE_PX = 50;
 
 const arrow =
   "glass absolute top-1/2 z-10 hidden size-11 -translate-y-1/2 place-items-center rounded-full transition hover:bg-white/20 active:scale-95 sm:grid";
 
 // Slider game mới cập nhật: ảnh chính full-bleed, chuyển mờ dần (opacity), màu nhấn theo từng game.
-// Tự chạy mỗi 6.5s; dừng khi rê chuột, bấm "Tạm dừng", hoặc người dùng bật prefers-reduced-motion.
+// Tự chạy theo INTERVAL (mặc định 6s); dừng khi rê chuột, bấm "Tạm dừng", hoặc người dùng bật prefers-reduced-motion.
 export default function HeroSlider({ games }: { games: Game[] }) {
   const n = games.length;
   const [cur, setCur] = useState(0);
