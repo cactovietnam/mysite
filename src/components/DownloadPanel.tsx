@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useModal } from "@/lib/use-modal";
 import type { Game } from "@/data/games";
 import { providerOf } from "@/lib/game-ui";
@@ -12,6 +12,22 @@ export default function DownloadPanel({ links, title }: { links: Game["links"]; 
 
   const modalRef = useModal(open, () => setOpen(false)); // khóa cuộn, nhốt Tab, Esc đóng, trả focus
 
+  // Popup mở: header nổi lên trên lớp phủ (CSS ở globals.css, theo thuộc tính data-dl-open).
+  // Bấm vào header thì đóng popup, tránh hai hộp thoại (vd Tìm kiếm) cùng mở và tranh focus/Esc.
+  useEffect(() => {
+    if (!open) return;
+    const root = document.documentElement;
+    root.setAttribute("data-dl-open", "");
+    const onDown = (e: PointerEvent) => {
+      if ((e.target as Element | null)?.closest?.("#site-header")) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      root.removeAttribute("data-dl-open"); // cũng chạy khi chuyển trang lúc popup đang mở
+    };
+  }, [open]);
+
   if (safe.length === 0) {
     return <p className="rounded-full bg-white/10 px-6 py-3 text-haze">Chưa có link tải cho game này.</p>;
   }
@@ -21,7 +37,9 @@ export default function DownloadPanel({ links, title }: { links: Game["links"]; 
       await navigator.clipboard.writeText(url);
       setCopied(url);
       setTimeout(() => setCopied(null), 1600);
-    } catch { /* trình duyệt chặn clipboard: bỏ qua */ }
+    } catch {
+      window.prompt("Sao chép link (Ctrl+C):", url); // trình duyệt chặn clipboard: cho người dùng chép tay
+    }
   };
 
   return (

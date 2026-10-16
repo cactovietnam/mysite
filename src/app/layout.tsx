@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="flex min-h-dvh flex-col font-sans antialiased">
         <ReloadReset />
         {site.ageGate.enabled && <AgeGate />}
-        <header className="sticky top-4 z-40 px-4">
+        <header id="site-header" className="sticky top-4 z-40 px-4">
           <div className="glass edge mx-auto flex h-14 max-w-6xl items-center gap-2 rounded-full pl-3 pr-2 shadow-lg shadow-black/20">
             <Brand />
             {/* tab ở giữa (từ md trở lên); điện thoại chỉ còn logo + tìm kiếm, lọc engine đã có sẵn trong Kho game */}

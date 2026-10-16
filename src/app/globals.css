@@ -83,3 +83,8 @@ body::after {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Popup tải xuống đang mở: đưa header lên trên lớp phủ (z-50) để không bị tối/mờ (vẫn dưới cổng 18+ z-[60]).
+   Dải trong suốt hai bên pill không chặn chuột, nên bấm ra ngoài popup vẫn đóng được. */
+html[data-dl-open] #site-header { z-index: 55; pointer-events: none; }
+html[data-dl-open] #site-header > * { pointer-events: auto; }

@@ -384,18 +384,6 @@ body::after {
 .anim-pop  { animation: pop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0ms); }
 .anim-fade { animation: fade 0.2s ease both; }
 
-/* Poster nghiêng theo con trỏ chuột */
-.tilt {
-  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-  transition: transform 0.3s ease-out;
-  will-change: transform;
-}
-.tilt-glare {
-  position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  background: radial-gradient(circle at var(--gx, 30%) var(--gy, 0%), rgba(255,255,255,0.22), transparent 55%);
-  transition: background-position 0.3s;
-}
-
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {
@@ -403,7 +391,6 @@ body::after {
     animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
   }
-  .tilt { transform: none !important; }
 }
 
 
@@ -513,7 +500,7 @@ import HeroSlider from "@/components/HeroSlider";
 import HowTo from "@/components/HowTo";
 import Library from "@/components/Library";
 import RandomGame from "@/components/RandomGame";
-import StatsStrip from "@/components/StatsStrip";
+import QuickAccess from "@/components/QuickAccess";
 
 const SLIDES = 5; // số game mới nhất đưa lên slider
 
@@ -525,7 +512,7 @@ export default function Home() {
       <h1 className="sr-only">{site.name} - {site.home.libraryTitle}</h1>
       <HeroSlider games={sorted.slice(0, SLIDES)} />
       <Announcement />
-      <StatsStrip games={sorted} />
+      <QuickAccess games={sorted} />
       <section id="kho-game" className="mx-auto max-w-6xl scroll-mt-24 px-4 pb-20 pt-16">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display text-3xl font-bold tracking-tight">{site.home.libraryTitle}</h2>
@@ -1961,268 +1948,6 @@ export default function GameCard({ game }: { game: Game }) {
 }
 
 
-=== FILE: src/components/Hero.tsx ===
-
-import Link from "next/link";
-import type { Game } from "@/data/games";
-import { accentHex, accentStyle, fmtDate } from "@/lib/game-ui";
-import Cover from "./Cover";
-import EngineChip from "./EngineChip";
-import Tilt from "./Tilt";
-import { site } from "@/data/site";
-
-const d = (ms: number) => ({ "--d": `${ms}ms` }) as React.CSSProperties;
-
-// Chip meta: nhãn mờ + giá trị đậm, số canh đều (tabular-nums)
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="inline-flex items-baseline gap-2 rounded-full bg-white/10 px-3.5 py-1">
-      <span className="text-xs text-haze">{label}</span>
-      <span className="font-semibold tabular-nums text-mist">{value}</span>
-    </span>
-  );
-}
-
-export default function Hero({ game }: { game: Game }) {
-  const glow = accentHex(game);
-  const blurBg = game.blur ? { backgroundImage: `url("${game.blur}")` } : undefined;
-
-  return (
-    <section className="mx-auto mt-6 max-w-6xl px-4" style={accentStyle(game)}>
-      <div className="relative isolate overflow-hidden rounded-[2.5rem] border border-white/10 bg-plum">
-        {/* nền: ảnh mờ 32px phóng lớn (không dùng filter blur nên nhẹ GPU), 2 vệt sáng theo accent/accent2 */}
-        <div aria-hidden className="absolute inset-0 -z-10">
-          {blurBg ? (
-            <div className="absolute inset-0 scale-125 bg-cover bg-center opacity-60" style={blurBg} />
-          ) : (
-            <Cover decorative src={game.cover} title={game.title} engine={game.engine}
-                   className="h-full w-full scale-125 object-cover opacity-40 md:opacity-55 md:blur-2xl" />
-          )}
-          <div className="absolute inset-0"
-               style={{ background: "radial-gradient(60% 90% at 88% 8%, color-mix(in srgb, var(--accent) 38%, transparent), transparent 70%), radial-gradient(50% 80% at 4% 100%, color-mix(in srgb, var(--accent2) 30%, transparent), transparent 70%)" }} />
-          <div className="absolute inset-0 bg-gradient-to-r from-plum via-plum/70 to-plum/10" />
-        </div>
-
-        <div className="grid items-center gap-10 p-7 sm:p-10 md:grid-cols-[1.25fr_0.75fr] md:p-14">
-          <div>
-            <p className="anim-rise inline-flex items-center gap-2.5 rounded-full bg-accent/15 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-accent" style={d(0)}>
-              <span className="relative flex size-2">
-                <span className="absolute inset-0 animate-ping rounded-full bg-accent/70" />
-                <span className="relative size-2 rounded-full bg-accent" />
-              </span>
-              {site.home.featuredBadge}
-            </p>
-
-            <h1 className="anim-rise mt-5 font-display text-5xl font-extrabold leading-[0.95] tracking-tight text-balance sm:text-6xl md:text-7xl" style={d(90)}>
-              {game.title}
-            </h1>
-
-            <p className="anim-rise mt-6 max-w-[46ch] text-lg leading-relaxed text-white/70" style={d(180)}>
-              {game.description}
-            </p>
-
-            <div className="anim-rise mt-6 flex flex-wrap items-center gap-2.5 text-sm" style={d(260)}>
-              <EngineChip engine={game.engine} className="bg-accent/10 text-mist ring-1 ring-accent/40" />
-              <Meta label="Phiên bản" value={game.version} />
-              <Meta label="Dung lượng" value={`${game.sizeGB}GB`} />
-              <Meta label="Cập nhật" value={fmtDate(game.updatedAt)} />
-            </div>
-
-            <div className="anim-rise mt-9" style={d(340)}>
-              <Link href={`/game/${game.slug}`}
-                    className="inline-flex items-center rounded-full bg-accent px-7 py-3.5 font-semibold text-on-accent shadow-[0_14px_36px_-12px_var(--accent)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_-10px_var(--accent)] active:translate-y-0">
-                {site.home.featuredButton}
-              </Link>
-            </div>
-          </div>
-
-          <div className="anim-rise mx-auto w-full max-w-[300px] md:max-w-[320px]" style={d(200)}>
-            <Tilt className="rounded-[2rem]" style={{ boxShadow: `0 40px 90px -24px ${glow}99` }}>
-              <Link href={`/game/${game.slug}`} aria-label={game.title}
-                    className="block aspect-[3/4] overflow-hidden rounded-[2rem] bg-cover ring-1 ring-white/20" style={blurBg}>
-                <Cover src={game.cover} title={game.title} engine={game.engine} priority className="h-full w-full object-cover" />
-              </Link>
-            </Tilt>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-
-=== FILE: src/components/HeroCarousel.tsx ===
-
-"use client";
-import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { Game } from "@/data/games";
-import { accentStyle, fmtDate } from "@/lib/game-ui";
-import { site } from "@/data/site";
-import Cover from "./Cover";
-import EngineChip from "./EngineChip";
-
-const INTERVAL = 6500;
-const SWIPE_PX = 50;
-const ctrl = "glass grid size-11 place-items-center rounded-full transition hover:bg-white/20 active:scale-95";
-
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="inline-flex items-baseline gap-2 rounded-full bg-white/10 px-3.5 py-1">
-      <span className="text-xs text-haze">{label}</span>
-      <span className="font-semibold tabular-nums text-mist">{value}</span>
-    </span>
-  );
-}
-
-const Chevron = ({ dir }: { dir: "l" | "r" }) => (
-  <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d={dir === "l" ? "m12 4-6 6 6 6" : "m8 4 6 6-6 6"} />
-  </svg>
-);
-
-// Banner trượt: game mới cập nhật. Tự chạy, dừng khi rê chuột / bấm "Tạm dừng" / tab ẩn / người dùng giảm chuyển động.
-// --accent của cả khối đổi theo game đang hiện nên nút, glow, thanh tiến trình luôn ăn màu ảnh.
-export default function HeroCarousel({ games }: { games: Game[] }) {
-  const n = games.length;
-  const [i, setI] = useState(0);
-  const [userPaused, setUserPaused] = useState(false);
-  const [hover, setHover] = useState(false);
-  const [away, setAway] = useState(false);
-  const [reduced, setReduced] = useState(false);
-  const touchX = useRef<number | null>(null);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const syncMotion = () => setReduced(mq.matches);
-    const syncVis = () => setAway(document.hidden);
-    syncMotion(); syncVis();
-    mq.addEventListener("change", syncMotion);
-    document.addEventListener("visibilitychange", syncVis);
-    return () => { mq.removeEventListener("change", syncMotion); document.removeEventListener("visibilitychange", syncVis); };
-  }, []);
-
-  const playing = n > 1 && !userPaused && !hover && !away && !reduced;
-  const go = useCallback((d: number) => setI((c) => (c + d + n) % n), [n]);
-
-  // đổi slide thủ công (i đổi) thì bộ đếm chạy lại từ đầu
-  useEffect(() => {
-    if (!playing) return;
-    const t = setTimeout(() => go(1), INTERVAL);
-    return () => clearTimeout(t);
-  }, [playing, i, go]);
-
-  if (n === 0) return null;
-  const cur = games[Math.min(i, n - 1)];
-
-  return (
-    <section aria-roledescription="carousel" aria-label="Game mới cập nhật" className="mx-auto mt-4 max-w-6xl px-4" style={accentStyle(cur)}>
-      <div className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-plum"
-           onPointerEnter={(e) => { if (e.pointerType === "mouse") setHover(true); }}
-           onPointerLeave={() => setHover(false)}
-           onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
-           onTouchEnd={(e) => {
-             if (touchX.current === null) return;
-             const dx = e.changedTouches[0].clientX - touchX.current;
-             touchX.current = null;
-             if (Math.abs(dx) > SWIPE_PX) go(dx < 0 ? 1 : -1);
-           }}>
-        {/* mọi slide xếp chồng trong cùng 1 ô lưới: khung cao bằng slide cao nhất, chuyển slide bằng opacity */}
-        <div className="grid" aria-live={playing ? "off" : "polite"}>
-          {games.map((g, idx) => {
-            const active = idx === i;
-            return (
-              <article key={g.slug} role="group" aria-roledescription="slide" aria-label={`${idx + 1} / ${n}`}
-                       aria-hidden={!active} inert={!active}
-                       className={`relative isolate flex min-h-[500px] items-center overflow-hidden transition-opacity duration-700 [grid-area:1/1] md:min-h-[540px] ${
-                         active ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-                <div aria-hidden className="absolute inset-0 -z-10 bg-cover" style={g.blur ? { backgroundImage: `url("${g.blur}")` } : undefined}>
-                  <Cover decorative priority={idx === 0} src={g.cover} title={g.title} engine={g.engine}
-                         className={`h-full w-full object-cover object-[60%_25%] transition-transform duration-[8000ms] ease-out ${active ? "scale-105" : "scale-100"}`} />
-                  <div className="absolute inset-0"
-                       style={{ background: `radial-gradient(55% 80% at 90% 10%, color-mix(in srgb, ${g.accent ?? "var(--accent)"} 32%, transparent), transparent 70%)` }} />
-                  <div className="absolute inset-0 hidden md:block"
-                       style={{ background: "linear-gradient(90deg, rgba(15,12,26,0.94) 0%, rgba(15,12,26,0.78) 34%, rgba(15,12,26,0.25) 66%, rgba(15,12,26,0) 100%)" }} />
-                  <div className="absolute inset-0 md:hidden"
-                       style={{ background: "linear-gradient(180deg, rgba(15,12,26,0.35) 0%, rgba(15,12,26,0.55) 40%, rgba(15,12,26,0.95) 100%)" }} />
-                  <div className="absolute inset-0"
-                       style={{ background: "linear-gradient(0deg, #1a1530 0%, rgba(26,21,48,0) 28%)" }} />
-                </div>
-
-                <div className="w-full px-6 pb-24 pt-14 sm:px-10 md:px-20 md:pb-24">
-                  <p className="inline-flex items-center gap-2.5 rounded-full bg-accent/15 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-accent ring-1 ring-accent/30">
-                    <span className="relative flex size-2">
-                      {active && playing && <span className="absolute inset-0 animate-ping rounded-full bg-accent/70" />}
-                      <span className="relative size-2 rounded-full bg-accent" />
-                    </span>
-                    {site.home.featuredBadge}
-                  </p>
-
-                  <h2 className="mt-5 line-clamp-3 max-w-[20ch] font-display text-4xl font-extrabold leading-[0.98] tracking-tight text-balance sm:text-5xl md:text-6xl">
-                    {g.title}
-                  </h2>
-                  <p className="mt-5 line-clamp-3 max-w-[56ch] text-base leading-relaxed text-white/75 sm:text-lg">{g.description}</p>
-
-                  <div className="mt-6 flex flex-wrap items-center gap-2.5 text-sm">
-                    <EngineChip engine={g.engine} className="bg-accent/10 text-mist ring-1 ring-accent/40" />
-                    <Meta label="Phiên bản" value={g.version} />
-                    <Meta label="Dung lượng" value={`${g.sizeGB}GB`} />
-                    <Meta label="Cập nhật" value={fmtDate(g.updatedAt)} />
-                  </div>
-
-                  <Link href={`/game/${g.slug}`}
-                        className="group mt-8 inline-flex items-center gap-3 rounded-full bg-accent py-3 pl-7 pr-4 font-semibold text-on-accent shadow-[0_14px_36px_-12px_var(--accent)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_-10px_var(--accent)] active:translate-y-0">
-                    {site.home.featuredButton}
-                    <svg viewBox="0 0 20 20" className="size-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M4 10h12m0 0-5-5m5 5-5 5" />
-                    </svg>
-                  </Link>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-
-        {n > 1 && (
-          <>
-            <button type="button" onClick={() => go(-1)} aria-label="Game trước" className={`${ctrl} absolute left-4 top-1/2 hidden -translate-y-1/2 md:grid`}><Chevron dir="l" /></button>
-            <button type="button" onClick={() => go(1)} aria-label="Game sau" className={`${ctrl} absolute right-4 top-1/2 hidden -translate-y-1/2 md:grid`}><Chevron dir="r" /></button>
-
-            <div className="absolute inset-x-0 bottom-4 flex items-center justify-center gap-3 px-4 md:justify-end md:pr-8">
-              <span className="text-xs font-medium tabular-nums text-haze" aria-hidden>
-                {String(i + 1).padStart(2, "0")}/{String(n).padStart(2, "0")}
-              </span>
-              <div className="flex items-center" role="group" aria-label="Chọn slide">
-                {games.map((g, idx) => {
-                  const active = idx === i;
-                  return (
-                    <button key={g.slug} type="button" onClick={() => setI(idx)} aria-label={`Xem ${g.title}`} aria-current={active || undefined}
-                            className="grid h-6 place-items-center px-1">
-                      <span className={`block h-1.5 overflow-hidden rounded-full bg-white/25 transition-[width] duration-300 ${active ? "w-10" : "w-2.5"}`}>
-                        {active && (
-                          <span key={`${i}-${playing}`} className="block h-full origin-left rounded-full bg-accent"
-                                style={playing ? { animation: `fill ${INTERVAL}ms linear forwards` } : undefined} />
-                        )}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              {!reduced && (
-                <button type="button" onClick={() => setUserPaused((p) => !p)} aria-pressed={userPaused}
-                        className="glass rounded-full px-4 py-1.5 text-xs font-semibold transition hover:bg-white/15 active:scale-95">
-                  {userPaused ? "Phát" : "Tạm dừng"}
-                </button>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </section>
-  );
-}
-
-
 === FILE: src/components/HeroSlider.tsx ===
 
 "use client";
@@ -2236,14 +1961,16 @@ import Cover from "./Cover";
 import EngineChip from "./EngineChip";
 import { AdultChip, PatchChip } from "./GameBadges";
 
-const INTERVAL = 6500;
+// Số giây tự chuyển slide: site.json -> home.sliderSeconds (sửa ở quan_ly.py mục 7). Kẹp 2-30 giây, sai/thiếu thì dùng 6.
+const rawSec = Number((site.home as { sliderSeconds?: unknown }).sliderSeconds);
+const INTERVAL = (Number.isFinite(rawSec) ? Math.min(30, Math.max(2, rawSec)) : 6) * 1000;
 const SWIPE_PX = 50;
 
 const arrow =
   "glass absolute top-1/2 z-10 hidden size-11 -translate-y-1/2 place-items-center rounded-full transition hover:bg-white/20 active:scale-95 sm:grid";
 
 // Slider game mới cập nhật: ảnh chính full-bleed, chuyển mờ dần (opacity), màu nhấn theo từng game.
-// Tự chạy mỗi 6.5s; dừng khi rê chuột, bấm "Tạm dừng", hoặc người dùng bật prefers-reduced-motion.
+// Tự chạy theo INTERVAL (mặc định 6s); dừng khi rê chuột, bấm "Tạm dừng", hoặc người dùng bật prefers-reduced-motion.
 export default function HeroSlider({ games }: { games: Game[] }) {
   const n = games.length;
   const [cur, setCur] = useState(0);
@@ -2650,88 +2377,6 @@ export default function NavLinks({ engines }: { engines: string[] }) {
 }
 
 
-=== FILE: src/components/NavTabs.tsx ===
-
-"use client";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useSyncExternalStore } from "react";
-import { site } from "@/data/site";
-import SearchBox from "./SearchBox";
-
-// Đồng bộ với Library: Library nghe "filter-change" + popstate để đọc ?engine=... từ URL.
-const EVENT = "filter-change";
-const subscribe = (cb: () => void) => {
-  window.addEventListener("popstate", cb);
-  window.addEventListener("hashchange", cb);
-  window.addEventListener(EVENT, cb);
-  return () => { window.removeEventListener("popstate", cb); window.removeEventListener("hashchange", cb); window.removeEventListener(EVENT, cb); };
-};
-const getLoc = () => window.location.search + window.location.hash;
-
-type Tab = { id: string; label: string; href: string; active: boolean };
-
-export default function NavTabs({ engines }: { engines: string[] }) {
-  const pathname = usePathname();
-  const loc = useSyncExternalStore(subscribe, getLoc, () => "");
-  const [query, hash = ""] = loc.split("#");
-  const engine = new URLSearchParams(query).get("engine");
-  const home = pathname === "/";
-  const fresh = home && !engine;
-
-  const tabs: Tab[] = [
-    { id: "home", label: site.nav.explore, href: "/", active: fresh && !hash },
-    { id: "new", label: site.home.featuredBadge, href: "/#kho-game", active: fresh && hash === "kho-game" },
-    ...engines.map((e) => ({
-      id: e, label: e, href: `/?engine=${encodeURIComponent(e)}#kho-game`, active: home && engine === e,
-    })),
-  ];
-
-  // Đang ở trang chủ: đổi URL tại chỗ (Library lọc ngay, không tải lại). Trang khác: để Link điều hướng.
-  const onClick = (e: React.MouseEvent, href: string) => {
-    if (!home || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-    e.preventDefault();
-    window.history.pushState(null, "", href);
-    window.dispatchEvent(new Event(EVENT));
-    const id = href.split("#")[1];
-    if (id) document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-    else window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const link = "relative whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition";
-
-  return (
-    <div className="sticky top-4 z-40 px-4">
-      <div className="mx-auto flex max-w-6xl items-center gap-2">
-        {/* SearchBox nằm NGOÀI .glass: backdrop-filter biến .glass thành khung chứa của phần tử fixed, hộp tìm kiếm sẽ bị kẹt trong thanh */}
-        <nav aria-label="Điều hướng chính" className="glass edge flex min-w-0 flex-1 rounded-full p-1.5 shadow-lg shadow-black/20">
-          <ul className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {tabs.map((t) => (
-              // ml-auto / mr-auto ở đầu và cuối: căn giữa khi vừa chỗ, vẫn cuộn được tới tab đầu khi tràn (justify-center sẽ cắt mất)
-              <li key={t.id} className="shrink-0 first:ml-auto last:mr-auto">
-                <Link href={t.href} onClick={(e) => onClick(e, t.href)} aria-current={t.active ? "page" : undefined}
-                      className={`${link} ${t.active ? "bg-white/10 text-mist" : "text-mist/70 hover:bg-white/10 hover:text-mist"}`}>
-                  {t.label}
-                  {t.active && <span aria-hidden className="absolute inset-x-4 -bottom-0.5 h-0.5 rounded-full bg-gradient-to-r from-berry to-[#7c5cff]" />}
-                </Link>
-              </li>
-            ))}
-            {/^https?:\/\//i.test(site.discord) && (
-              <li className="hidden shrink-0 sm:block">
-                <a href={site.discord} target="_blank" rel="noopener noreferrer" className={`${link} text-mist/70 hover:bg-white/10 hover:text-mist`}>
-                  {site.nav.discord}
-                </a>
-              </li>
-            )}
-          </ul>
-        </nav>
-        <SearchBox />
-      </div>
-    </div>
-  );
-}
-
-
 === FILE: src/components/NewBadge.tsx ===
 
 "use client";
@@ -2758,10 +2403,92 @@ export default function NewBadge({ updatedAt, className = "" }: { updatedAt: str
 }
 
 
-=== FILE: src/components/NoticeBar.tsx ===
+=== FILE: src/components/QuickAccess.tsx ===
 
-// Giữ lại để import cũ vẫn chạy; thanh thông báo thật nằm ở Announcement.tsx.
-export { default } from "./Announcement";
+"use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { Game } from "@/data/games";
+import { site } from "@/data/site";
+import { engineColor, fmtDate } from "@/lib/game-ui";
+import { gameBadges } from "@/lib/game-badges";
+import { softNav } from "@/lib/soft-nav";
+
+type Tile = { id: string; label: string; count: number; dot: string; search: string };
+
+const arrow = (
+  <svg viewBox="0 0 20 20" className="size-4 shrink-0 text-haze transition duration-300 group-hover:translate-x-0.5 group-hover:text-mist"
+       fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M4 10h12m0 0-4-4m4 4-4 4" />
+  </svg>
+);
+
+// Lối tắt vào Kho game: mỗi ô là một bộ lọc dựng sẵn (engine, Việt hóa, Cheat) kèm số game thật,
+// bấm là cuộn xuống Kho game và lọc ngay. Số liệu tự tính từ games.json, không cần sửa tay.
+export default function QuickAccess({ games }: { games: Game[] }) {
+  const pathname = usePathname();
+  if (games.length === 0) return null;
+
+  const engines = Array.from(new Set(games.map((g) => g.engine)));
+  const badges = games.map((g) => gameBadges(g.tags).patch?.label ?? "");
+  const vh = badges.filter((l) => l === "Việt hóa" || l === "VH&Cheat").length;
+  const cheat = badges.filter((l) => l === "Cheat" || l === "VH&Cheat").length;
+  const latest = games.reduce((m, g) => (g.updatedAt > m ? g.updatedAt : m), "");
+
+  const tiles: Tile[] = [
+    { id: "all", label: "Tất cả game", count: games.length, dot: "#ff6b98", search: "" },
+    ...engines.map((e) => ({
+      id: `e-${e}`, label: e, count: games.filter((g) => g.engine === e).length,
+      dot: engineColor(e), search: `?engine=${encodeURIComponent(e)}`,
+    })),
+    ...(vh > 0 ? [{ id: "vh", label: "Việt hóa", count: vh, dot: "#2dd4bf", search: `?tag=${encodeURIComponent("Việt hóa")}` }] : []),
+    ...(cheat > 0 ? [{ id: "cheat", label: "Có Cheat", count: cheat, dot: "#fbbf24", search: "?tag=Cheat" }] : []),
+  ];
+  const hasDiscord = /^https?:\/\//i.test(site.discord);
+
+  return (
+    <section aria-label="Khám phá nhanh" className="mx-auto mt-4 max-w-6xl px-4">
+      <div className="mb-3 flex items-baseline justify-between gap-3 px-1">
+        <h2 className="font-display text-lg font-bold tracking-tight">Khám phá nhanh</h2>
+        {latest && <p className="text-xs tabular-nums text-haze">Cập nhật gần nhất: {fmtDate(latest)}</p>}
+      </div>
+
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {tiles.map((t) => (
+          <li key={t.id}>
+            <Link href={`/${t.search}#kho-game`} onClick={(e) => softNav(e, pathname, t.search, "library")}
+                  className="glass group flex h-full items-center justify-between gap-3 rounded-2xl px-5 py-4 transition duration-300 hover:-translate-y-0.5 hover:bg-white/10 active:scale-[0.98]">
+              <span className="min-w-0">
+                <span className="flex items-center gap-2 text-sm text-haze">
+                  <i aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: t.dot, boxShadow: `0 0 10px ${t.dot}` }} />
+                  <span className="truncate">{t.label}</span>
+                </span>
+                <span className="mt-1 block font-display text-2xl font-extrabold tabular-nums tracking-tight sm:text-3xl">
+                  {t.count}<span className="ml-1.5 text-sm font-medium text-haze">game</span>
+                </span>
+              </span>
+              {arrow}
+            </Link>
+          </li>
+        ))}
+
+        {hasDiscord && (
+          <li className="col-span-2 sm:col-span-1">
+            <a href={site.discord} target="_blank" rel="noopener noreferrer"
+               className="group relative flex h-full items-center justify-between gap-3 overflow-hidden rounded-2xl border border-white/10 px-5 py-4 transition duration-300 hover:-translate-y-0.5 active:scale-[0.98]"
+               style={{ background: "linear-gradient(135deg, rgba(124,92,255,0.34), rgba(255,107,152,0.2)), rgba(30,24,56,0.84)" }}>
+              <span className="min-w-0">
+                <span className="block font-display text-lg font-bold tracking-tight">{site.nav.discord}</span>
+                <span className="mt-0.5 block text-xs leading-snug text-mist/75">Báo link lỗi, nhận tin game mới</span>
+              </span>
+              {arrow}
+            </a>
+          </li>
+        )}
+      </ul>
+    </section>
+  );
+}
 
 
 === FILE: src/components/RandomGame.tsx ===
@@ -2961,44 +2688,6 @@ export default function SimilarGames({ current, all }: { current: Game; all: Gam
 }
 
 
-=== FILE: src/components/StatsStrip.tsx ===
-
-import type { Game } from "@/data/games";
-import { fmtDate } from "@/lib/game-ui";
-
-// Dải số liệu: tự tính từ games.json nên không cần sửa tay.
-export default function StatsStrip({ games }: { games: Game[] }) {
-  if (games.length === 0) return null;
-
-  const totalGB = Math.round(games.reduce((s, g) => s + (g.sizeGB || 0), 0) * 10) / 10;
-  const engines = new Set(games.map((g) => g.engine)).size;
-  const latest = games.reduce((m, g) => (g.updatedAt > m ? g.updatedAt : m), "");
-
-  const items = [
-    { label: "Game trong kho", value: String(games.length), dot: "#ff6b98" },
-    { label: "Tổng dung lượng", value: `${totalGB}GB`, dot: "#60a5fa" },
-    { label: "Engine", value: String(engines), dot: "#2dd4bf" },
-    { label: "Cập nhật gần nhất", value: fmtDate(latest), dot: "#fb923c" },
-  ];
-
-  return (
-    <section aria-label="Thống kê" className="mx-auto mt-4 max-w-6xl px-4">
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {items.map((it) => (
-          <div key={it.label} className="glass rounded-2xl px-5 py-4">
-            <dt className="flex items-center gap-2 text-sm text-haze">
-              <i aria-hidden className="size-2 rounded-full" style={{ background: it.dot, boxShadow: `0 0 10px ${it.dot}` }} />
-              {it.label}
-            </dt>
-            <dd className="mt-1.5 font-display text-2xl font-extrabold tabular-nums tracking-tight sm:text-3xl">{it.value}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
-}
-
-
 === FILE: src/components/TagList.tsx ===
 
 "use client";
@@ -3027,45 +2716,6 @@ export default function TagList({ tags, lead, limit = 10, className = "" }: {
         </li>
       )}
     </ul>
-  );
-}
-
-
-=== FILE: src/components/Tilt.tsx ===
-
-"use client";
-import { useRef } from "react";
-
-// Bọc nội dung để nghiêng 3D nhẹ theo chuột (chỉ chuột, bỏ qua cảm ứng).
-export default function Tilt({ children, className = "", style }: {
-  children: React.ReactNode; className?: string; style?: React.CSSProperties;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  const move = (e: React.PointerEvent) => {
-    const el = ref.current;
-    if (!el || e.pointerType !== "mouse") return;
-    const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width - 0.5;
-    const y = (e.clientY - r.top) / r.height - 0.5;
-    el.style.setProperty("--rx", `${(-y * 10).toFixed(2)}deg`);
-    el.style.setProperty("--ry", `${(x * 12).toFixed(2)}deg`);
-    el.style.setProperty("--gx", `${((x + 0.5) * 100).toFixed(0)}%`);
-    el.style.setProperty("--gy", `${((y + 0.5) * 100).toFixed(0)}%`);
-  };
-  const leave = () => {
-    const el = ref.current;
-    if (!el) return;
-    ["--rx", "--ry", "--gx", "--gy"].forEach((p) => el.style.removeProperty(p));
-  };
-
-  return (
-    <div style={{ perspective: 1000 }} onPointerMove={move} onPointerLeave={leave}>
-      <div ref={ref} className={`tilt relative ${className}`} style={style}>
-        {children}
-        <span className="tilt-glare" />
-      </div>
-    </div>
   );
 }
 
@@ -3222,6 +2872,7 @@ export const games: Game[] = (data as unknown as Raw[]).map((g) => {
     "libraryTitle": "Kho game",
     "featuredBadge": "Mới cập nhật",
     "featuredButton": "Xem game",
+    "sliderSeconds": 3.6,
     "announcement": "Chào mừng bạn đến GSVH! Cùng khám phá game và những bản mới cập nhật.",
     "announcementLabel": "Thông báo"
   },
