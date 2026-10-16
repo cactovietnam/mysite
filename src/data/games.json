@@ -96,7 +96,7 @@
     "engine": "RPGM",
     "version": "26.10.07",
     "sizeGB": 0.9,
-    "cover": "/covers/lisaria/47d4c7e314.webp",
+    "cover": "/covers/lisaria/55cd4a7bbf.webp",
     "images": [
       "/covers/lisaria/b30749050e.webp",
       "/covers/lisaria/7c371fdc3d.webp",
@@ -126,8 +126,8 @@
         "url": "https://gofile.io/d/fQDuCqBm"
       }
     ],
-    "accent": "#f07f57",
+    "accent": "#e26f64",
     "accent2": "#5eb4c9",
-    "blur": "data:image/webp;base64,UklGRigBAABXRUJQVlA4IBwBAABwBgCdASogABgAPu1iqU2ppaOiMAgBMB2JaACdMxhOYJINbsgeafAI4C1W0Q+9gWa3rcZRBS+jyPO2BBAA/revfWIAk8q5NSEZAVX+xGbo2Ctup1vB/lV6X4LhFOB9JZpJb8t3+0nLxljGCNgrkOrLNd9JYkNQLVvAT1kHFNsIAe0aHAKI6VZPalbtThCfG1tDljQ0TFV7jNNbSQOWMAG2jFl2qH0g7FTcA8IAIc0lFO2/y89iHgaCuXdDeomtAuPFBvAGQAKPcyrMyjFXigJrcskJV9hIyCFYWXnfZD/4Ea6kPFojA8FbVoJbBYls0aUYemZA3+73zWUEGMo/QPTwWEcjpPd5ES0pJFmHUuCdLDZjX7SyfLfgrwAAAA=="
+    "blur": "data:image/webp;base64,UklGRigBAABXRUJQVlA4IBwBAAAQBgCdASogABgAPu1iqU2ppaOiMAgBMB2JaACdOUFUFcLB6vXU9OygQUbzkGKCaO5hyXpL+K2EJ4AA/rewUlb2YSloHdLLah5lQcG67lbUB2MGa2fNERalWOp38AzB5HxOAbWrS/nUCdBcVSTUub8IEM5w2Lp2arRcnJ3i7fzTlYZBYZYhkKCTkaFGmTxvj2D9FOCzWAoDSJR9yKLkOHSPO3qeg4iQKvYVSP7vm2gtG1BPUwyrr5X5wPkqElV47MoSRPYNmz/B5C/FXNqEFmtOFPPBg+xGKIh6dzzX8CNd8VVvBeTeTLbH96nYIS0M9JAvG+3el5mwIVLP1aOkoY11SMhzEggi2D26Cip9XhV5pA/Fy/tMZw/3Dr4AAA=="
   }
 ]
