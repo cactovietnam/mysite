@@ -20,6 +20,16 @@ export type Game = {
   links: { label: string; url: string }[];
 };
 
+// Dữ liệu nhẹ cho danh sách/thẻ game (client component): bỏ các trường nặng chỉ trang chi tiết mới cần.
+// Danh sách trắng có chủ ý: thêm trường nặng mới vào Game sẽ không tự lọt vào payload trang chủ.
+export type GameCardData = Omit<Game, "description" | "images" | "links">;
+
+export const toCard = (g: Game): GameCardData => ({
+  slug: g.slug, title: g.title, engine: g.engine, version: g.version, sizeGB: g.sizeGB,
+  cover: g.cover, thumb: g.thumb, blur: g.blur, accent: g.accent, accent2: g.accent2,
+  tags: g.tags, updatedAt: g.updatedAt,
+});
+
 export const thumbOf = (g: Pick<Game, "thumb" | "cover">) => g.thumb || g.cover;
 
 type Raw = Omit<Game, "cover" | "images" | "tags" | "links"> &
