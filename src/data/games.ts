@@ -13,6 +13,7 @@ export type Game = {
   tags: string[];
   intro: string; // SƠ LƯỢC ngắn (1-2 câu), hiện NGOÀI game: slider trang chủ + đầu trang game. Trống thì lấy khổ đầu của content
   content: string[]; // NỘI DUNG GAME: mỗi phần tử là 1 khổ văn bản (quan_ly.py: Enter = sang khổ mới)
+  contentFold: number; // hiện sẵn N khổ đầu, các khổ sau ẩn sau nút "Xem thêm" (quan_ly.py: /cat N). 0 = hiện hết
   updatedAt: string;
   accent?: string; // màu nhấn #rrggbb, quan_ly.py tự tính từ ảnh chính (thiếu thì web dùng màu hồng mặc định)
   accent2?: string;
@@ -23,7 +24,7 @@ export type Game = {
 
 // Dữ liệu nhẹ cho danh sách/thẻ game (client component): bỏ các trường nặng chỉ trang chi tiết mới cần.
 // Danh sách trắng có chủ ý: thêm trường nặng mới vào Game sẽ không tự lọt vào payload trang chủ.
-export type GameCardData = Omit<Game, "intro" | "content" | "images" | "links">;
+export type GameCardData = Omit<Game, "intro" | "content" | "contentFold" | "images" | "links">;
 
 export const toCard = (g: Game): GameCardData => ({
   slug: g.slug, title: g.title, engine: g.engine, version: g.version, sizeGB: g.sizeGB,
@@ -45,8 +46,8 @@ export const metaDescription = (g: Pick<Game, "intro" | "content">) => {
 export const thumbOf = (g: Pick<Game, "thumb" | "cover">) => g.thumb || g.cover;
 
 // description = trường cũ (1 chuỗi). Dữ liệu chưa chạy lại quan_ly.py vẫn hiển thị đúng: tự đổi thành content.
-type Raw = Omit<Game, "cover" | "images" | "tags" | "links" | "intro" | "content"> &
-  Partial<Pick<Game, "cover" | "images" | "tags" | "links" | "intro" | "content">> & { description?: string };
+type Raw = Omit<Game, "cover" | "images" | "tags" | "links" | "intro" | "content" | "contentFold"> &
+  Partial<Pick<Game, "cover" | "images" | "tags" | "links" | "intro" | "content" | "contentFold">> & { description?: string };
 
 // Mảng khổ (hoặc chuỗi cũ, tách theo dòng) -> mảng khổ sạch, bỏ khổ rỗng.
 const paragraphs = (v: unknown): string[] =>
@@ -59,5 +60,9 @@ export const games: Game[] = (data as unknown as Raw[]).map(({ description, ...g
     .filter((u) => u && u !== cover)
     .slice(0, MAX_EXTRA_IMAGES);
   const content = paragraphs(g.content?.length ? g.content : description);
-  return { ...g, cover, images, tags: g.tags ?? [], links: g.links ?? [], intro: (g.intro ?? "").trim(), content };
+  const fold = Math.floor(Number(g.contentFold) || 0);
+  return {
+    ...g, cover, images, tags: g.tags ?? [], links: g.links ?? [], intro: (g.intro ?? "").trim(), content,
+    contentFold: fold > 0 && fold < content.length ? fold : 0, // fold >= số khổ thì không có gì để ẩn
+  };
 });
