@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useModal } from "@/lib/use-modal";
 
 const btn = "glass rounded-full px-5 py-2.5 text-sm font-medium transition hover:bg-white/20 active:scale-95";
 
@@ -14,17 +15,17 @@ export default function Gallery({ images, title }: { images: string[]; title: st
   const go = (d: number) => { setZoom(false); setCur((c) => (c === null ? c : (c + d + n) % n)); };
   const close = () => { setZoom(false); setCur(null); };
 
+  // useModal lo khóa cuộn nền, nhốt Tab, Esc đóng và trả focus; ở đây chỉ còn phím mũi tên.
+  const dialogRef = useModal(open, close);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setZoom(false); setCur(null); }
       if (e.key === "ArrowRight") { setZoom(false); setCur((c) => (c === null ? c : (c + 1) % n)); }
       if (e.key === "ArrowLeft") { setZoom(false); setCur((c) => (c === null ? c : (c - 1 + n) % n)); }
     };
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden"; // khóa cuộn trang phía sau
     window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+    return () => window.removeEventListener("keydown", onKey);
   }, [open, n]);
 
   return (
@@ -43,7 +44,7 @@ export default function Gallery({ images, title }: { images: string[]; title: st
       </div>
 
       {cur !== null && (
-        <div role="dialog" aria-modal="true" aria-label="Xem ảnh"
+        <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Xem ảnh"
              className="anim-fade fixed inset-0 z-50 flex flex-col bg-ink/95 md:backdrop-blur-md"
              onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
              onTouchEnd={(e) => {

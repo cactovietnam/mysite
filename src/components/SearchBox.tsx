@@ -4,12 +4,15 @@ import { createPortal } from "react-dom";
 import type Fuse from "fuse.js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { fold } from "@/lib/library-filter";
 import { useModal } from "@/lib/use-modal";
 import Cover from "./Cover";
 
 // Khớp với src/app/search-index.json/route.ts
 type Item = { slug: string; title: string; engine: string; version: string; tags: string[]; thumb: string };
-type Index = { items: Item[]; fuse: Fuse<Item> };
+// Trường đã bỏ dấu (tính ở client, không làm nặng search-index.json): gõ "viet hoa" vẫn ra "Việt hóa".
+type Row = Item & { _t: string; _g: string[]; _e: string };
+type Index = { items: Item[]; fuse: Fuse<Row> };
 
 // Tải chỉ mục + fuse.js đúng một lần, lúc người dùng sắp dùng tìm kiếm (rê chuột / focus / mở). Lỗi thì lần sau thử lại.
 let pending: Promise<Index> | null = null;
@@ -19,7 +22,10 @@ function loadIndex(): Promise<Index> {
     fetch("/search-index.json").then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<Item[]>; }),
   ]).then(([{ default: FuseCtor }, items]) => ({
     items,
-    fuse: new FuseCtor(items, { keys: ["title", "tags", "engine"], threshold: 0.35 }),
+    fuse: new FuseCtor<Row>(
+      items.map((it) => ({ ...it, _t: fold(it.title), _g: it.tags.map(fold), _e: fold(it.engine) })),
+      { keys: ["_t", "_g", "_e"], threshold: 0.35 },
+    ),
   })).catch((e) => { pending = null; throw e; });
   return pending;
 }
@@ -31,7 +37,7 @@ export default function SearchBox() {
   const [idx, setIdx] = useState(0);
   const [index, setIndex] = useState<Index | null>(null);
   const [failed, setFailed] = useState(false);
-  const results = index ? (q ? index.fuse.search(q).slice(0, 6).map((r) => r.item) : index.items.slice(0, 5)) : [];
+  const results = index ? (q ? index.fuse.search(fold(q)).slice(0, 6).map((r) => r.item) : index.items.slice(0, 5)) : [];
 
   useEffect(() => {
     if (!open || index) return;

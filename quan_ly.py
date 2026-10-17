@@ -28,7 +28,14 @@ SKIP_NAMES = {"thumbs.db", "desktop.ini", ".ds_store"}
 MAX_EXTRA = 10      # số ảnh bổ sung tối đa
 COVER_W = 1920      # ảnh chính dùng làm nền nên cho rộng hơn
 EXTRA_W = 1600
+WEBP_Q = 80         # chất lượng WebP ảnh chính/phụ (85 -> 80 thường nhẹ hơn ~15-25%, mắt thường khó thấy); method=6 nén kỹ hơn, chậm hơn chút
+WEBP_METHOD = 6
 THUMB_W = 640       # ảnh nhỏ cho thẻ game / ô tìm kiếm / game tương tự (hiện ~380px nên 640 đủ nét cho màn 1.5x-2x)
+
+# git: PUSH_ALL = True -> mục [9] đẩy MỌI thay đổi (code web + dữ liệu + ảnh), trừ file trong .gitignore.
+#      PUSH_ALL = False -> chỉ đẩy PUSH_PATHS, code web đang sửa dở KHÔNG bị kéo theo vào commit.
+PUSH_ALL = True
+PUSH_PATHS = ("src/data", "public/covers", ".gitignore")
 
 # --- đóng dấu logo lên mọi ảnh thêm vào (ảnh gốc trong anh-moi/ không bị sửa) ---
 WM_ON = True          # False = tắt đóng dấu
@@ -121,6 +128,15 @@ def load_site(): return merge(SITE_DEFAULT, read_json(SITE, {}))
 def normalize(g):
     """Ảnh chính nằm riêng ở g['cover']; g['images'] chỉ là ảnh bổ sung (không trùng ảnh chính, tối đa 10)."""
     g.setdefault("links", []); g.setdefault("tags", []); g.setdefault("images", [])
+    # intro = sơ lược ngắn; content = list các khổ. Dữ liệu cũ có 'description' (1 chuỗi) tự đổi thành content khi nạp.
+    legacy = g.pop("description", "")
+    g["intro"] = str(g.get("intro") or "").strip()
+    raw = g.get("content") or legacy or []
+    if isinstance(raw, str): raw = raw.splitlines()
+    g["content"] = [str(p).strip() for p in raw if str(p).strip()]
+    try: fold = int(g.get("contentFold") or 0)   # hiện sẵn N khổ đầu, còn lại ẩn sau "Xem thêm" (0 = hiện hết)
+    except (TypeError, ValueError): fold = 0
+    g["contentFold"] = fold if 0 < fold < len(g["content"]) else 0
     cover = g.get("cover") or (g["images"][0] if g["images"] else "")
     g["cover"] = cover
     extras = []
@@ -304,6 +320,81 @@ def ask_nums(prompt, n):
         try: return parse_nums(s, n)
         except ValueError as e: print("  !", e)
 
+# ---------- intro + nội dung game (nhiều khổ) ----------
+INTRO_WARN = 300   # intro dài hơn mức này: chỉ cảnh báo (web tự cắt bớt ở slider)
+PARA_HELP = """
+  NỘI DUNG GAME: gõ từng khổ, mỗi lần Enter = chốt khổ đó và sang khổ kế tiếp.
+  Enter KHÔNG kết thúc và KHÔNG lưu. Dán nhiều dòng cùng lúc cũng được (mỗi dòng = 1 khổ).
+  Lệnh (gõ ở đầu dòng):  /luu = xem trước rồi lưu | /huy = bỏ thay đổi | /xem = xem các khổ
+                         /sua N = sửa khổ N | /chen N = chèn khổ mới trước khổ N
+                         /xoa [N] = xóa khổ N (bỏ trống = khổ cuối) | /xoahet = xóa tất cả
+                         /cat N = chỉ hiện N khổ đầu, các khổ sau ẩn sau nút "Xem thêm" | /cat 0 = hiện hết
+  (Khổ cần bắt đầu bằng dấu / thì gõ // ở đầu.)"""
+
+def ask_intro(default=""):
+    print("\n  INTRO = sơ lược ngắn (1-2 câu) hiện NGOÀI game: slider trang chủ + đầu trang game.")
+    if default: s = input(f"  Intro hiện tại: {default}\n  Intro mới (Enter = giữ, '-' = xóa): ").strip()
+    else: s = input("  Intro (Enter = để trống): ").strip()
+    if not s: return default
+    if s == "-": return ""
+    if len(s) > INTRO_WARN: print(f"  ! Intro dài {len(s)} ký tự (nên dưới {INTRO_WARN}); web sẽ cắt bớt ở slider.")
+    return s
+
+def _show_paras(paras, fold=0):
+    if not paras: print("    (chưa có khổ nào)"); return
+    for i, p in enumerate(paras, 1):
+        print(f"    Khổ {i} ({len(p)} ký tự): {p if len(p) <= 90 else p[:87] + '...'}")
+        if 0 < fold == i < len(paras): print('    ------ từ đây trở xuống bị ẨN, hiện sau nút "Xem thêm" ------')
+
+def _para_idx(arg, n):
+    return int(arg) - 1 if arg.isdigit() and 1 <= int(arg) <= n else None
+
+def ask_paragraphs(default, fold=0):
+    """Nhập nội dung nhiều khổ -> (list[str], fold). Enter chỉ chốt 1 khổ và mở khổ mới; chỉ /luu (+ xác nhận) mới kết thúc."""
+    original, paras, warned, orig_fold = list(default), list(default), False, fold
+    print(PARA_HELP)
+    if paras: print("\n  Nội dung hiện tại:"); _show_paras(paras, fold)
+    while True:
+        try: text = input(f"  Khổ {len(paras) + 1} > ").strip()
+        except EOFError:
+            print("\n  (Mất đầu vào, giữ nguyên nội dung cũ)"); return original, orig_fold
+        if not text:   # Enter trống: bỏ qua, không kết thúc
+            if not warned: print("    (Dòng trống bị bỏ qua. /luu để lưu, /huy để hủy.)"); warned = True
+            continue
+        if not text.startswith("/") or text.startswith("//"):
+            paras.append(text[1:] if text.startswith("//") else text); continue
+        cmd, _, arg = text[1:].partition(" "); cmd, arg = cmd.lower(), arg.strip()
+        if cmd in ("luu", "xong"):
+            if not 0 < fold < len(paras): fold = 0
+            print("\n  --- XEM TRƯỚC ---"); _show_paras(paras, fold)
+            if not fold and len(paras) >= 4: print("  (Mẹo: /cat N để chỉ hiện N khổ đầu, phần còn lại ẩn sau nút 'Xem thêm')")
+            if input(f"  Xác nhận lưu {len(paras)} khổ? (Y/n): ").strip().lower() != "n": return paras, fold
+        elif cmd == "huy":
+            if paras == original or input("  Bỏ mọi thay đổi ở phần này? (y/N): ").strip().lower() == "y": return original, orig_fold
+        elif cmd == "xem": _show_paras(paras, fold)
+        elif cmd == "cat":
+            n = int(arg) if arg.isdigit() else None
+            if n is None or n >= len(paras): print(f"    ! Dùng: /cat N (N trong khoảng 1-{max(len(paras) - 1, 1)}; /cat 0 = hiện hết)"); continue
+            fold = n; print(f"    ✓ Hiện {n} khổ đầu, {len(paras) - n} khổ sau ẩn sau 'Xem thêm'" if n else "    ✓ Hiện hết các khổ")
+        elif cmd == "xoahet":
+            if input("  Xóa TẤT CẢ các khổ? (y/N): ").strip().lower() == "y": paras, fold = [], 0
+        elif cmd in ("sua", "chen", "xoa"):
+            i = (len(paras) - 1 if not arg and cmd == "xoa" and paras else _para_idx(arg, len(paras) + (cmd == "chen")))
+            if i is None: print(f"    ! Dùng: /{cmd} N (N trong khoảng 1-{len(paras) + (cmd == 'chen')})"); continue
+            if cmd == "xoa":
+                print(f"    ✓ Đã xóa khổ {i + 1}"); del paras[i]
+                if i < fold: fold -= 1   # khổ bị xóa nằm trong phần hiện sẵn
+            elif cmd == "sua":
+                print(f"    Khổ {i + 1} hiện tại: {paras[i]}")
+                new = input("    Nhập lại khổ này (Enter trống = giữ nguyên): ").strip()
+                if new: paras[i] = new
+            else:
+                new = input(f"    Nội dung khổ mới (sẽ nằm trước khổ {i + 1}; Enter trống = hủy): ").strip()
+                if new:
+                    paras.insert(i, new)
+                    if i < fold: fold += 1
+        else: print("    ! Không hiểu lệnh. Lệnh: /luu /huy /xem /sua /chen /xoa /xoahet")
+
 def show_games(games):
     if not games: print("  (chưa có game nào)")
     for i, g in enumerate(games, 1):
@@ -424,7 +515,7 @@ def encode(src, max_w):
         im = stamp_logo(im)
         if not alpha and im.mode != "RGB": im = im.convert("RGB")
         buf = io.BytesIO()
-        im.save(buf, "WEBP", quality=85, method=4)
+        im.save(buf, "WEBP", quality=WEBP_Q, method=WEBP_METHOD)
         return buf.getvalue(), "webp"
 
 def store(game, src, max_w):
@@ -659,7 +750,9 @@ def do_add_game():
         "cover": "",
         "images": [],
         "tags": ask_tags([]),
-        "description": ask("Mô tả ngắn"),
+        "intro": ask_intro(""),
+        "content": (_c := ask_paragraphs([], 0))[0],
+        "contentFold": _c[1],
         "updatedAt": ask_date(datetime.date.today().isoformat()),
         "links": [],
     }
@@ -680,7 +773,9 @@ def do_edit_game():
     g["version"] = ask("Phiên bản", g["version"])
     g["sizeGB"] = ask_size(g["sizeGB"])
     g["tags"] = ask_tags(g["tags"])
-    g["description"] = ask("Mô tả ngắn", g["description"])
+    g["intro"] = ask_intro(g["intro"])
+    if not g["content"] or input(f"Sửa 'Nội dung game' / vị trí nút Xem thêm (hiện {len(g['content'])} khổ)? (y/N): ").strip().lower() == "y":
+        g["content"], g["contentFold"] = ask_paragraphs(g["content"], g["contentFold"])
     g["updatedAt"] = ask_date(g["updatedAt"])
     if g["version"] != old_version and input("Phiên bản đổi. Đặt ngày cập nhật = hôm nay? (Y/n): ").strip().lower() != "n":
         g["updatedAt"] = datetime.date.today().isoformat()
@@ -805,23 +900,36 @@ def ensure_gitignore():
         run("git", "rm", "-r", "--cached", "-q", "--", "anh-moi", "anh-goc", "backup")
         print("  (Đã gỡ anh-moi/ và backup/ khỏi git; chúng vẫn nằm trên máy bạn)")
 
+def _in_push_paths(porcelain_line):
+    path = porcelain_line[3:].split(" -> ")[-1].strip().strip('"').replace("\\", "/")
+    return any(path == p or path.startswith(p.rstrip("/") + "/") for p in PUSH_PATHS)
+
 def do_push():
     if not has_git():
         print("\n  Thư mục này chưa phải git repo."); return False
-    status = run("git", "status", "--porcelain").stdout.strip().splitlines()
+    allst = run("git", "status", "--porcelain", "-uall").stdout.splitlines()
+    status = allst if PUSH_ALL else [l for l in allst if _in_push_paths(l)]
+    other = [] if PUSH_ALL else [l for l in allst if not _in_push_paths(l)]
+    if other:
+        print(f"\n  (Có {len(other)} file khác đang thay đổi, ví dụ code web: sẽ KHÔNG được đẩy cùng.)")
+        for l in other[:5]: print("   ", l)
+        if len(other) > 5: print(f"    ... và {len(other) - 5} mục nữa")
     if not status:
-        print("\n  Không có thay đổi nào để đẩy."); return False
+        print("\n  Không có thay đổi dữ liệu/ảnh nào để đẩy."); return False
     imgs = sum(1 for l in status if "public/covers" in l)
     print(f"\n  Sẽ đẩy {len(status)} thay đổi ({imgs} thuộc ảnh):")
     for l in status[:15]: print("   ", l)
     if len(status) > 15: print(f"    ... và {len(status) - 15} mục nữa")
     msg = ask("Ghi chú commit", "cap nhat game")
-    for cmd in (("git", "add", "-A"), ("git", "commit", "-m", msg)):
-        r = run(*cmd)
-        if r.returncode != 0:
-            print(f"\n  ✗ Lỗi ở '{' '.join(cmd[:2])}':\n{r.stderr or r.stdout}"); return False
+    for p in (["."] if PUSH_ALL else PUSH_PATHS):  # từng đường dẫn riêng: đường dẫn chưa tồn tại không làm hỏng cả lệnh
+        r = run("git", "add", "-A", "--", p)
+        if r.returncode != 0 and "did not match" not in (r.stderr or ""):
+            print(f"\n  ✗ Lỗi ở 'git add {p}':\n{r.stderr or r.stdout}"); return False
+    r = run("git", "commit", "-m", msg)
+    if r.returncode != 0:
+        print(f"\n  ✗ Lỗi ở 'git commit':\n{r.stderr or r.stdout}"); return False
     if run("git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}").returncode == 0:
-        r = run("git", "pull", "--rebase")  # lấy commit mới từ GitHub trước khi đẩy
+        r = run("git", "pull", "--rebase", "--autostash")  # autostash: file code đang sửa dở không cản việc đồng bộ
         if r.returncode != 0:
             run("git", "rebase", "--abort")
             print(f"\n  ✗ Xung đột khi đồng bộ với GitHub, đã hoàn tác. Commit local vẫn còn.\n{r.stderr or r.stdout}")
@@ -840,6 +948,7 @@ def do_check():
     games = load(); problems = 0; referenced = set(); urls = []
     for g in games:
         if not g["cover"]: print(f"  ! {g['title']}: chưa có ảnh chính"); problems += 1
+        if not g["intro"]: print(f"  ! {g['title']}: chưa có intro (web tạm lấy khổ đầu của nội dung)"); problems += 1
         for u in ([g["cover"]] if g["cover"] else []) + ([g["thumb"]] if g.get("thumb") else []) + g["images"]:
             referenced.add(u); urls.append(u)
             p = PUBLIC / u.lstrip("/")
@@ -872,7 +981,7 @@ def do_check():
 MENU = """
 === MYSITE ===
  [1] Thêm game mới (kèm bước thêm ảnh)
- [2] Sửa thông tin game (tên, phiên bản, dung lượng, ngày, tag, mô tả)
+ [2] Sửa thông tin game (tên, phiên bản, dung lượng, ngày, tag, intro, nội dung)
  [3] Quản lý link tải (Gofile, Drive...)
  [4] Thêm / đổi ảnh (ảnh chính + ảnh bổ sung)
  [5] Đổi ảnh chính / xóa ảnh bổ sung

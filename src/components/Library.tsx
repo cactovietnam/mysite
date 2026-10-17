@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState, useSyncExternalStore } from "react";
-import type { Game } from "@/data/games";
+import type { GameCardData } from "@/data/games";
 import { site } from "@/data/site";
 import { applyFilters, buildTagIndex, parseFilters, serializeFilters, type Filters } from "@/lib/library-filter";
 import FilterPanel from "./FilterPanel";
@@ -21,7 +21,7 @@ const getSearch = () => window.location.search;
 const PAGE = 30; // số game hiện mỗi lượt; bấm "Xem thêm" để hiện tiếp
 const PRESETS = (site as { tagPresets?: string[] }).tagPresets ?? [];
 
-export default function Library({ games }: { games: Game[] }) {
+export default function Library({ games }: { games: GameCardData[] }) {
   const engines = useMemo(() => Array.from(new Set(games.map((g) => g.engine))), [games]);
   const tagIndex = useMemo(() => buildTagIndex(games, PRESETS), [games]);
   const search = useSyncExternalStore(subscribe, getSearch, () => "");

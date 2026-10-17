@@ -1,0 +1,254 @@
+diff --git a/next.config.ts b/next.config.ts
+index a0cf0c7..ceac4b0 100644
+--- a/next.config.ts
++++ b/next.config.ts
+@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
+ 
+ const nextConfig: NextConfig = {
+   /* config options here */
++  // Tên file ảnh trong public/covers là hash nội dung (quan_ly.py) nên cache vĩnh viễn là an toàn.
++  async headers() {
++    return [
++      { source: "/covers/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
++    ];
++  },
+   cacheComponents: true,
+   partialPrefetching: true,
+   turbopack: {
+diff --git a/src/app/page.tsx b/src/app/page.tsx
+index 0edaa22..4c7ee52 100644
+--- a/src/app/page.tsx
++++ b/src/app/page.tsx
+@@ -1,4 +1,4 @@
+-import { games } from "@/data/games";
++import { games, toCard } from "@/data/games";
+ import { site } from "@/data/site";
+ import Announcement from "@/components/Announcement";
+ import HeroSlider from "@/components/HeroSlider";
+@@ -11,19 +11,20 @@ const SLIDES = 5; // số game mới nhất đưa lên slider
+ 
+ export default function Home() {
+   const sorted = [...games].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
++  const cards = sorted.map(toCard); // client component chỉ nhận trường nhẹ; HeroSlider cần description nên giữ bản đầy đủ
+ 
+   return (
+     <main>
+       <h1 className="sr-only">{site.name} - {site.home.libraryTitle}</h1>
+       <HeroSlider games={sorted.slice(0, SLIDES)} />
+       <Announcement />
+-      <QuickAccess games={sorted} />
++      <QuickAccess games={cards} />
+       <section id="kho-game" className="mx-auto max-w-6xl scroll-mt-24 px-4 pb-20 pt-16">
+         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+           <h2 className="font-display text-3xl font-bold tracking-tight">{site.home.libraryTitle}</h2>
+           <RandomGame slugs={sorted.map((g) => g.slug)} />
+         </div>
+-        <Library games={sorted} />
++        <Library games={cards} />
+       </section>
+       <HowTo />
+     </main>
+diff --git a/src/components/Gallery.tsx b/src/components/Gallery.tsx
+index 5850c91..c4fcd4c 100644
+--- a/src/components/Gallery.tsx
++++ b/src/components/Gallery.tsx
+@@ -1,5 +1,6 @@
+ "use client";
+ import { useEffect, useRef, useState } from "react";
++import { useModal } from "@/lib/use-modal";
+ 
+ const btn = "glass rounded-full px-5 py-2.5 text-sm font-medium transition hover:bg-white/20 active:scale-95";
+ 
+@@ -14,17 +15,17 @@ export default function Gallery({ images, title }: { images: string[]; title: st
+   const go = (d: number) => { setZoom(false); setCur((c) => (c === null ? c : (c + d + n) % n)); };
+   const close = () => { setZoom(false); setCur(null); };
+ 
++  // useModal lo khóa cuộn nền, nhốt Tab, Esc đóng và trả focus; ở đây chỉ còn phím mũi tên.
++  const dialogRef = useModal(open, close);
++
+   useEffect(() => {
+     if (!open) return;
+     const onKey = (e: KeyboardEvent) => {
+-      if (e.key === "Escape") { setZoom(false); setCur(null); }
+       if (e.key === "ArrowRight") { setZoom(false); setCur((c) => (c === null ? c : (c + 1) % n)); }
+       if (e.key === "ArrowLeft") { setZoom(false); setCur((c) => (c === null ? c : (c - 1 + n) % n)); }
+     };
+-    const prev = document.body.style.overflow;
+-    document.body.style.overflow = "hidden"; // khóa cuộn trang phía sau
+     window.addEventListener("keydown", onKey);
+-    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
++    return () => window.removeEventListener("keydown", onKey);
+   }, [open, n]);
+ 
+   return (
+@@ -43,7 +44,7 @@ export default function Gallery({ images, title }: { images: string[]; title: st
+       </div>
+ 
+       {cur !== null && (
+-        <div role="dialog" aria-modal="true" aria-label="Xem ảnh"
++        <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Xem ảnh"
+              className="anim-fade fixed inset-0 z-50 flex flex-col bg-ink/95 md:backdrop-blur-md"
+              onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+              onTouchEnd={(e) => {
+diff --git a/src/components/GameCard.tsx b/src/components/GameCard.tsx
+index 4368f8f..d2d4f36 100644
+--- a/src/components/GameCard.tsx
++++ b/src/components/GameCard.tsx
+@@ -1,5 +1,5 @@
+ import Link from "next/link";
+-import { thumbOf, type Game } from "@/data/games";
++import { thumbOf, type GameCardData } from "@/data/games";
+ import { engineColor, fmtDate, isHex } from "@/lib/game-ui";
+ import { gameBadges, isBadgeTag } from "@/lib/game-badges";
+ import Cover from "./Cover";
+@@ -7,7 +7,7 @@ import EngineChip from "./EngineChip";
+ import { PatchChip } from "./GameBadges";
+ import NewBadge from "./NewBadge";
+ 
+-export default function GameCard({ game }: { game: Game }) {
++export default function GameCard({ game }: { game: GameCardData }) {
+   const glow = isHex(game.accent) ? game.accent : engineColor(game.engine);
+   const tags = game.tags.filter((t) => !isBadgeTag(t)).slice(0, 3);
+   const { adult, patch } = gameBadges(game.tags);
+diff --git a/src/components/Library.tsx b/src/components/Library.tsx
+index c36a5f8..bf99ee0 100644
+--- a/src/components/Library.tsx
++++ b/src/components/Library.tsx
+@@ -1,6 +1,6 @@
+ "use client";
+ import { useMemo, useState, useSyncExternalStore } from "react";
+-import type { Game } from "@/data/games";
++import type { GameCardData } from "@/data/games";
+ import { site } from "@/data/site";
+ import { applyFilters, buildTagIndex, parseFilters, serializeFilters, type Filters } from "@/lib/library-filter";
+ import FilterPanel from "./FilterPanel";
+@@ -21,7 +21,7 @@ const getSearch = () => window.location.search;
+ const PAGE = 30; // số game hiện mỗi lượt; bấm "Xem thêm" để hiện tiếp
+ const PRESETS = (site as { tagPresets?: string[] }).tagPresets ?? [];
+ 
+-export default function Library({ games }: { games: Game[] }) {
++export default function Library({ games }: { games: GameCardData[] }) {
+   const engines = useMemo(() => Array.from(new Set(games.map((g) => g.engine))), [games]);
+   const tagIndex = useMemo(() => buildTagIndex(games, PRESETS), [games]);
+   const search = useSyncExternalStore(subscribe, getSearch, () => "");
+diff --git a/src/components/QuickAccess.tsx b/src/components/QuickAccess.tsx
+index 233c408..d3872c2 100644
+--- a/src/components/QuickAccess.tsx
++++ b/src/components/QuickAccess.tsx
+@@ -1,7 +1,7 @@
+ "use client";
+ import Link from "next/link";
+ import { usePathname } from "next/navigation";
+-import type { Game } from "@/data/games";
++import type { GameCardData } from "@/data/games";
+ import { site } from "@/data/site";
+ import { engineColor, fmtDate } from "@/lib/game-ui";
+ import { gameBadges } from "@/lib/game-badges";
+@@ -18,7 +18,7 @@ const arrow = (
+ 
+ // Lối tắt vào Kho game: mỗi ô là một bộ lọc dựng sẵn (engine, Việt hóa, Cheat) kèm số game thật,
+ // bấm là cuộn xuống Kho game và lọc ngay. Số liệu tự tính từ games.json, không cần sửa tay.
+-export default function QuickAccess({ games }: { games: Game[] }) {
++export default function QuickAccess({ games }: { games: GameCardData[] }) {
+   const pathname = usePathname();
+   if (games.length === 0) return null;
+ 
+diff --git a/src/components/SearchBox.tsx b/src/components/SearchBox.tsx
+index a934077..e1509c4 100644
+--- a/src/components/SearchBox.tsx
++++ b/src/components/SearchBox.tsx
+@@ -4,12 +4,15 @@ import { createPortal } from "react-dom";
+ import type Fuse from "fuse.js";
+ import Link from "next/link";
+ import { useRouter } from "next/navigation";
++import { fold } from "@/lib/library-filter";
+ import { useModal } from "@/lib/use-modal";
+ import Cover from "./Cover";
+ 
+ // Khớp với src/app/search-index.json/route.ts
+ type Item = { slug: string; title: string; engine: string; version: string; tags: string[]; thumb: string };
+-type Index = { items: Item[]; fuse: Fuse<Item> };
++// Trường đã bỏ dấu (tính ở client, không làm nặng search-index.json): gõ "viet hoa" vẫn ra "Việt hóa".
++type Row = Item & { _t: string; _g: string[]; _e: string };
++type Index = { items: Item[]; fuse: Fuse<Row> };
+ 
+ // Tải chỉ mục + fuse.js đúng một lần, lúc người dùng sắp dùng tìm kiếm (rê chuột / focus / mở). Lỗi thì lần sau thử lại.
+ let pending: Promise<Index> | null = null;
+@@ -19,7 +22,10 @@ function loadIndex(): Promise<Index> {
+     fetch("/search-index.json").then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<Item[]>; }),
+   ]).then(([{ default: FuseCtor }, items]) => ({
+     items,
+-    fuse: new FuseCtor(items, { keys: ["title", "tags", "engine"], threshold: 0.35 }),
++    fuse: new FuseCtor<Row>(
++      items.map((it) => ({ ...it, _t: fold(it.title), _g: it.tags.map(fold), _e: fold(it.engine) })),
++      { keys: ["_t", "_g", "_e"], threshold: 0.35 },
++    ),
+   })).catch((e) => { pending = null; throw e; });
+   return pending;
+ }
+@@ -31,7 +37,7 @@ export default function SearchBox() {
+   const [idx, setIdx] = useState(0);
+   const [index, setIndex] = useState<Index | null>(null);
+   const [failed, setFailed] = useState(false);
+-  const results = index ? (q ? index.fuse.search(q).slice(0, 6).map((r) => r.item) : index.items.slice(0, 5)) : [];
++  const results = index ? (q ? index.fuse.search(fold(q)).slice(0, 6).map((r) => r.item) : index.items.slice(0, 5)) : [];
+ 
+   useEffect(() => {
+     if (!open || index) return;
+diff --git a/src/data/games.ts b/src/data/games.ts
+index a4ae8bd..6bc2129 100644
+--- a/src/data/games.ts
++++ b/src/data/games.ts
+@@ -20,6 +20,16 @@ export type Game = {
+   links: { label: string; url: string }[];
+ };
+ 
++// Dữ liệu nhẹ cho danh sách/thẻ game (client component): bỏ các trường nặng chỉ trang chi tiết mới cần.
++// Danh sách trắng có chủ ý: thêm trường nặng mới vào Game sẽ không tự lọt vào payload trang chủ.
++export type GameCardData = Omit<Game, "description" | "images" | "links">;
++
++export const toCard = (g: Game): GameCardData => ({
++  slug: g.slug, title: g.title, engine: g.engine, version: g.version, sizeGB: g.sizeGB,
++  cover: g.cover, thumb: g.thumb, blur: g.blur, accent: g.accent, accent2: g.accent2,
++  tags: g.tags, updatedAt: g.updatedAt,
++});
++
+ export const thumbOf = (g: Pick<Game, "thumb" | "cover">) => g.thumb || g.cover;
+ 
+ type Raw = Omit<Game, "cover" | "images" | "tags" | "links"> &
+diff --git a/src/lib/library-filter.ts b/src/lib/library-filter.ts
+index f54842e..dfc60ca 100644
+--- a/src/lib/library-filter.ts
++++ b/src/lib/library-filter.ts
+@@ -1,4 +1,4 @@
+-import type { Game } from "@/data/games";
++import type { GameCardData } from "@/data/games";
+ 
+ export type SortKey = "new" | "old" | "name" | "size";
+ export type TagMode = "or" | "and";
+@@ -26,7 +26,7 @@ export const fold = (s: string) =>
+ 
+ // Gộp tag gợi ý (presets) với tag thật trong dữ liệu. Trùng (không phân biệt hoa/thường/dấu) thì gộp một.
+ // Tag có game xếp trước (nhiều game nhất lên đầu), tag chưa có game xuống cuối.
+-export function buildTagIndex(games: Game[], presets: string[]): TagInfo[] {
++export function buildTagIndex(games: GameCardData[], presets: string[]): TagInfo[] {
+   const map = new Map<string, TagInfo>();
+   for (const raw of presets) {
+     const label = raw.trim();
+@@ -80,14 +80,14 @@ export function serializeFilters(f: Filters): string {
+   return s ? `?${s}` : "";
+ }
+ 
+-const COMPARE: Record<SortKey, (a: Game, b: Game) => number> = {
++const COMPARE: Record<SortKey, (a: GameCardData, b: GameCardData) => number> = {
+   new: (a, b) => b.updatedAt.localeCompare(a.updatedAt),
+   old: (a, b) => a.updatedAt.localeCompare(b.updatedAt),
+   name: (a, b) => a.title.localeCompare(b.title, "vi"),
+   size: (a, b) => a.sizeGB - b.sizeGB,
+ };
+ 
+-export function applyFilters(games: Game[], f: Filters): Game[] {
++export function applyFilters(games: GameCardData[], f: Filters): GameCardData[] {
+   const q = fold(f.q);
+   const want = f.tags.map(fold);
+   const out = games.filter((g) => {

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import type { Game } from "@/data/games";
+import type { SlideData } from "@/data/games";
 import { site } from "@/data/site";
 import { accentStyle, fmtDate } from "@/lib/game-ui";
 import { gameBadges } from "@/lib/game-badges";
@@ -19,7 +19,7 @@ const arrow =
 
 // Slider game mới cập nhật: ảnh chính full-bleed, chuyển mờ dần (opacity), màu nhấn theo từng game.
 // Tự chạy theo INTERVAL (mặc định 6s); dừng khi rê chuột, bấm "Tạm dừng", hoặc người dùng bật prefers-reduced-motion.
-export default function HeroSlider({ games }: { games: Game[] }) {
+export default function HeroSlider({ games }: { games: SlideData[] }) {
   const n = games.length;
   const [cur, setCur] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -102,7 +102,9 @@ export default function HeroSlider({ games }: { games: Game[] }) {
                     {s.title}
                   </h2>
 
-                  <p className="mt-4 line-clamp-2 max-w-[62ch] text-base leading-relaxed text-white/75 sm:text-lg">{s.description}</p>
+                  {s.summary && (
+                    <p className="mt-4 line-clamp-2 max-w-[62ch] text-base leading-relaxed text-white/75 sm:text-lg">{s.summary}</p>
+                  )}
 
                   <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-sm">
                     <EngineChip engine={s.engine} className="glass ring-1 ring-accent/45" />

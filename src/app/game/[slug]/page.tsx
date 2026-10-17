@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { games } from "@/data/games";
+import { games, metaDescription, summaryOf } from "@/data/games";
 import { site, siteUrl } from "@/data/site";
 import { accentStyle, fmtDate } from "@/lib/game-ui";
 import { gameBadges, isBadgeTag } from "@/lib/game-badges";
 import Cover from "@/components/Cover";
 import DownloadPanel from "@/components/DownloadPanel";
 import EngineChip from "@/components/EngineChip";
+import ExpandableContent from "@/components/ExpandableContent";
 import { AdultChip, PatchChip } from "@/components/GameBadges";
 import Gallery from "@/components/Gallery";
 import SimilarGames from "@/components/SimilarGames";
@@ -23,9 +24,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!game) return {};
   return {
     title: game.title,
-    description: game.description,
+    description: metaDescription(game),
     alternates: { canonical: `/game/${game.slug}` },
-    openGraph: { title: game.title, description: game.description, type: "website", images: game.cover ? [game.cover] : undefined },
+    openGraph: { title: game.title, description: metaDescription(game), type: "website", images: game.cover ? [game.cover] : undefined },
   };
 }
 
@@ -35,13 +36,14 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
   if (!game) notFound();
 
   const { adult, patch } = gameBadges(game.tags);
+  const summary = summaryOf(game); // intro (ngoài game); trống thì lấy khổ đầu của nội dung
   const abs = (path: string) => (siteUrl && path ? new URL(path, siteUrl).href : undefined);
   // JSON-LD cho Google. JSON.stringify tự bỏ trường undefined; thay "<" để chuỗi không thể đóng thẻ <script> sớm.
   const jsonLd = JSON.stringify({
     "@context": "https://schema.org",
     "@type": "VideoGame",
     name: game.title,
-    description: game.description || undefined,
+    description: summary || undefined,
     url: abs(`/game/${game.slug}`),
     image: abs(game.cover),
     softwareVersion: game.version,
@@ -97,7 +99,9 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
             {game.title}
           </h1>
 
-          <p className="mt-4 line-clamp-3 max-w-[58ch] text-base leading-relaxed text-white/70 sm:text-lg md:line-clamp-none">{game.description}</p>
+          {summary && (
+            <p className="mt-4 line-clamp-3 max-w-[58ch] text-base leading-relaxed text-white/70 sm:text-lg md:line-clamp-none">{summary}</p>
+          )}
 
           <dl className="mt-7 flex max-w-xl flex-wrap gap-x-10 gap-y-4 border-t border-white/15 pt-5">
             {stats.map((s) => (
@@ -138,10 +142,13 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
         </aside>
 
         <div className="order-1 min-w-0 space-y-10 lg:order-2 lg:space-y-12">
-          <section>
-            <h2 className="mb-3 font-display text-3xl font-bold tracking-tight">Giới thiệu</h2>
-            <p className="max-w-[62ch] whitespace-pre-line text-lg leading-relaxed text-white/70">{game.description}</p>
-          </section>
+          {/* Mỗi phần tử content = 1 khổ (thẻ <p> riêng). contentFold > 0: các khổ sau khổ đó ẩn sau nút "Xem thêm" */}
+          {game.content.length > 0 && (
+            <section>
+              <h2 className="mb-3 font-display text-3xl font-bold tracking-tight">Nội dung game</h2>
+              <ExpandableContent paragraphs={game.content} fold={game.contentFold} />
+            </section>
+          )}
 
           {/* Ảnh BỔ SUNG (tối đa 10): giúp hiểu thêm về game, không gồm ảnh chính */}
           {game.images.length > 0 && (

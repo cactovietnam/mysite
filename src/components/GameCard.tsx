@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { thumbOf, type Game } from "@/data/games";
+import { thumbOf, type GameCardData } from "@/data/games";
 import { engineColor, fmtDate, isHex } from "@/lib/game-ui";
 import { gameBadges, isBadgeTag } from "@/lib/game-badges";
 import Cover from "./Cover";
@@ -7,7 +7,7 @@ import EngineChip from "./EngineChip";
 import { PatchChip } from "./GameBadges";
 import NewBadge from "./NewBadge";
 
-export default function GameCard({ game }: { game: Game }) {
+export default function GameCard({ game }: { game: GameCardData }) {
   const glow = isHex(game.accent) ? game.accent : engineColor(game.engine);
   const tags = game.tags.filter((t) => !isBadgeTag(t)).slice(0, 3);
   const { adult, patch } = gameBadges(game.tags);

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { Game } from "@/data/games";
+import type { GameCardData } from "@/data/games";
 import { site } from "@/data/site";
 import { engineColor, fmtDate } from "@/lib/game-ui";
 import { gameBadges } from "@/lib/game-badges";
@@ -18,7 +18,7 @@ const arrow = (
 
 // Lối tắt vào Kho game: mỗi ô là một bộ lọc dựng sẵn (engine, Việt hóa, Cheat) kèm số game thật,
 // bấm là cuộn xuống Kho game và lọc ngay. Số liệu tự tính từ games.json, không cần sửa tay.
-export default function QuickAccess({ games }: { games: Game[] }) {
+export default function QuickAccess({ games }: { games: GameCardData[] }) {
   const pathname = usePathname();
   if (games.length === 0) return null;
 

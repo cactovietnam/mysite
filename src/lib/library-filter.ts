@@ -1,4 +1,4 @@
-import type { Game } from "@/data/games";
+import type { GameCardData } from "@/data/games";
 
 export type SortKey = "new" | "old" | "name" | "size";
 export type TagMode = "or" | "and";
@@ -26,7 +26,7 @@ export const fold = (s: string) =>
 
 // Gộp tag gợi ý (presets) với tag thật trong dữ liệu. Trùng (không phân biệt hoa/thường/dấu) thì gộp một.
 // Tag có game xếp trước (nhiều game nhất lên đầu), tag chưa có game xuống cuối.
-export function buildTagIndex(games: Game[], presets: string[]): TagInfo[] {
+export function buildTagIndex(games: GameCardData[], presets: string[]): TagInfo[] {
   const map = new Map<string, TagInfo>();
   for (const raw of presets) {
     const label = raw.trim();
@@ -80,14 +80,14 @@ export function serializeFilters(f: Filters): string {
   return s ? `?${s}` : "";
 }
 
-const COMPARE: Record<SortKey, (a: Game, b: Game) => number> = {
+const COMPARE: Record<SortKey, (a: GameCardData, b: GameCardData) => number> = {
   new: (a, b) => b.updatedAt.localeCompare(a.updatedAt),
   old: (a, b) => a.updatedAt.localeCompare(b.updatedAt),
   name: (a, b) => a.title.localeCompare(b.title, "vi"),
   size: (a, b) => a.sizeGB - b.sizeGB,
 };
 
-export function applyFilters(games: Game[], f: Filters): Game[] {
+export function applyFilters(games: GameCardData[], f: Filters): GameCardData[] {
   const q = fold(f.q);
   const want = f.tags.map(fold);
   const out = games.filter((g) => {
