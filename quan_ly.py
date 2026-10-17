@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "src" / "data" / "games.json"
 SITE = ROOT / "src" / "data" / "site.json"
+TAGS = ROOT / "src" / "data" / "tags.json"      # danh mục tag theo nhóm (web dùng tô màu, tool dùng gợi ý)
 PUBLIC = ROOT / "public"
 COVERS = PUBLIC / "covers"
 INBOX = ROOT / "anh-moi"
@@ -212,28 +213,69 @@ def _toggle(tags, label, aliases=None):
         return [t for t in tags if _fold(t) not in keys]
     return tags + [label]
 
+def load_catalog():
+    """Danh mục tag theo nhóm: [(nhãn nhóm, [tag...])]. Đọc src/data/tags.json; tag gợi ý cũ trong site.json mà chưa có thì gom vào nhóm riêng."""
+    groups = []
+    for g in (read_json(TAGS, {}) or {}).get("groups", []):
+        items = [t for t in g.get("tags", []) if isinstance(t, str) and t.strip()]
+        if items: groups.append((str(g.get("label") or g.get("id") or "Nhóm"), items))
+    known = {_fold(t) for _, items in groups for t in items}
+    extra = [t for t in load_site().get("tagPresets", []) if isinstance(t, str) and _fold(t) not in known]
+    if extra: groups.append(("Khác (từ site.json)" if groups else "Tag gợi ý", extra))
+    return groups
+
+def _pick_in_group(tags, title, items):
+    """Hiện các tag của 1 nhóm (3 cột), chọn số để bật/tắt. Lặp đến khi Enter."""
+    while True:
+        have = {_fold(t) for t in tags}
+        print(f"\n  === {title} ({len(items)} tag) ===")
+        cells = [f"[{i}]{'✓' if _fold(t) in have else ' '}{t}" for i, t in enumerate(items, 1)]
+        w = min(max(len(c) for c in cells) + 2, 34)
+        for r in range(0, len(cells), 3):
+            print("   " + "".join(c.ljust(w) for c in cells[r:r + 3]).rstrip())
+        picked = ask_nums("  Chọn số để bật/tắt (vd: 1 4 6-8 | all; Enter = quay lại): ", len(items))
+        if not picked: return tags
+        for i in picked: tags = _toggle(tags, items[i - 1])
+
+def pick_from_catalog(tags):
+    """Menu 2 cấp: chọn nhóm -> chọn tag. Gõ chữ (vd 'big') để tìm tag trong mọi nhóm."""
+    catalog = load_catalog()
+    if not catalog: print("  (Chưa có tag gợi ý. Thêm vào src/data/tags.json)"); return tags
+    while True:
+        have = {_fold(t) for t in tags}
+        print("\n  Nhóm tag:")
+        for i, (lb, items) in enumerate(catalog, 1):
+            n = sum(_fold(t) in have for t in items)
+            print(f"   [{i:>2}] {lb} ({len(items)} tag{f', đã chọn {n}' if n else ''})")
+        s = input("  Chọn nhóm (số) | gõ chữ để tìm tag | Enter = xong\n  > ").strip()
+        if not s: return tags
+        if s.isdigit():
+            if 1 <= int(s) <= len(catalog): tags = _pick_in_group(tags, *catalog[int(s) - 1])
+            else: print(f"  ! Không có nhóm số {s}")
+            continue
+        needle = _fold(s); hits, seen = [], set()
+        for _, items in catalog:
+            for t in items:
+                if needle in _fold(t) and _fold(t) not in seen: seen.add(_fold(t)); hits.append(t)
+        if hits: tags = _pick_in_group(tags, f"Kết quả cho '{s}'", hits)
+        else: print(f"  Không tìm thấy tag nào chứa '{s}'. Muốn tạo tag mới: quay lại và gõ +{s}")
+
 def ask_tags(default):
     """Sửa tag theo vòng lặp (Enter = xong). Không cần gõ lại cả danh sách khi chỉ muốn thêm/bớt 1-2 tag."""
     tags = _dedupe(default)
-    presets = [t for t in load_site().get("tagPresets", []) if isinstance(t, str)]
     while True:
         have = {_fold(t) for t in tags}
         quick = "  ".join(f"[{i}] {'✓' if have & al else ' '} {lb}" for i, (lb, al) in enumerate(QUICK_TAGS, 1))
         print(f"\n  Tag hiện tại: {', '.join(tags) or '(chưa có)'}")
         print(f"  Nhãn nhanh (bấm số để bật/tắt): {quick}")
-        s = input("  Enter = xong | +tag1, tag2 = thêm | -tag = bớt | p = chọn từ tag gợi ý | hoặc gõ cả danh sách mới\n  > ").strip()
+        s = input("  Enter = xong | +tag1, tag2 = thêm | -tag = bớt | p = chọn từ danh mục tag (theo nhóm, có tìm kiếm) | hoặc gõ cả danh sách mới\n  > ").strip()
         if not s: return tags
         if re.fullmatch(r"[\d\s,]+", s):                      # số: bật/tắt nhãn nhanh
             for n in re.findall(r"\d+", s):
                 if 1 <= int(n) <= len(QUICK_TAGS):
                     lb, al = QUICK_TAGS[int(n) - 1]; tags = _toggle(tags, lb, al)
                 else: print(f"  ! Không có nhãn nhanh số {n}")
-        elif s.lower() == "p":
-            if not presets: print("  (Chưa có tag gợi ý. Thêm vào src/data/site.json -> tagPresets)"); continue
-            have = {_fold(t) for t in tags}
-            print("  Tag gợi ý: " + "  ".join(f"[{i}]{'✓' if _fold(t) in have else ''}{t}" for i, t in enumerate(presets, 1)))
-            for i in ask_nums("  Chọn số để bật/tắt (vd: 1 4 6-8; Enter = bỏ qua): ", len(presets)):
-                tags = _toggle(tags, presets[i - 1])
+        elif s.lower() == "p": tags = pick_from_catalog(tags)
         elif s[0] == "+": tags = _dedupe(tags + _split_tags(s[1:]))
         elif s[0] == "-":
             drop = {_fold(t) for t in _split_tags(s[1:])}
