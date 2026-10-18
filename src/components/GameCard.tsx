@@ -1,19 +1,24 @@
+"use client";
 import Link from "next/link";
 import { thumbOf, type GameCardData } from "@/data/games";
 import { engineColor, fmtDate, isHex } from "@/lib/game-ui";
 import { gameBadges, isBadgeTag } from "@/lib/game-badges";
+import { useList } from "@/lib/user-lists";
 import Cover from "./Cover";
+import FavoriteButton from "./FavoriteButton";
 import EngineChip from "./EngineChip";
 import { PatchChip } from "./GameBadges";
 import NewBadge from "./NewBadge";
 
 export default function GameCard({ game }: { game: GameCardData }) {
+  const seen = useList("seen").includes(game.slug);
   const glow = isHex(game.accent) ? game.accent : engineColor(game.engine);
   const tags = game.tags.filter((t) => !isBadgeTag(t)).slice(0, 3);
   const { adult, patch } = gameBadges(game.tags);
   const frame = { "--c": glow, ...(game.blur ? { backgroundImage: `url("${game.blur}")` } : {}) } as React.CSSProperties;
 
   return (
+    <div className="relative">
     <Link href={`/game/${game.slug}`}
           className="group block rounded-[1.9rem] p-2 transition duration-300 ease-out hover:-translate-y-1 hover:bg-white/[0.06] focus-visible:-translate-y-1">
       {/* ảnh mờ làm nền: hiện ngay trong lúc ảnh thật còn đang tải */}
@@ -56,10 +61,14 @@ export default function GameCard({ game }: { game: GameCardData }) {
       </div>
 
       <p className="mt-2.5 flex flex-wrap gap-x-3 px-1 text-sm tabular-nums text-haze">
+        {seen && <span className="text-mist/70">Đã xem</span>}
         <span>v{game.version}</span>
         <span>{game.sizeGB}GB</span>
         <span>{fmtDate(game.updatedAt)}</span>
       </p>
     </Link>
+    {/* ngoài Link để không lồng nút trong thẻ a; nằm dưới nhãn 18+, trên ảnh */}
+    <div className="absolute left-5 top-14 z-10"><FavoriteButton slug={game.slug} /></div>
+    </div>
   );
 }

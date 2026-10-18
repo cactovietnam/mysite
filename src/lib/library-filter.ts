@@ -2,6 +2,7 @@ import type { GameCardData } from "@/data/games";
 
 export type SortKey = "new" | "old" | "name" | "size";
 export type TagMode = "or" | "and";
+export type ListKey = "all" | "fav" | "seen";
 
 export type Filters = {
   engine: string | null; // null = tất cả engine
@@ -9,6 +10,7 @@ export type Filters = {
   tags: string[]; // nhãn chuẩn (TagInfo.label)
   mode: TagMode; // or: có ít nhất 1 tag | and: có đủ mọi tag
   sort: SortKey;
+  list: ListKey; // all | fav (yêu thích) | seen (đã xem); lọc theo slug ở Library vì dữ liệu nằm ở trình duyệt
 };
 
 export type TagInfo = { key: string; label: string; count: number };
@@ -65,6 +67,7 @@ export function parseFilters(search: string, engines: string[], index: TagInfo[]
     tags,
     mode: sp.get("mode") === "and" ? "and" : "or",
     sort: SORTS.some((s) => s.key === sort) ? (sort as SortKey) : "new",
+    list: sp.get("list") === "fav" ? "fav" : sp.get("list") === "seen" ? "seen" : "all",
   };
 }
 
@@ -76,6 +79,7 @@ export function serializeFilters(f: Filters): string {
   for (const t of f.tags) sp.append("tag", t);
   if (f.mode === "and") sp.set("mode", "and");
   if (f.sort !== "new") sp.set("sort", f.sort);
+  if (f.list !== "all") sp.set("list", f.list);
   const s = sp.toString();
   return s ? `?${s}` : "";
 }

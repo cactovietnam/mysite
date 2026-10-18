@@ -6,6 +6,7 @@ import { site } from "@/data/site";
 import { engineColor, fmtDate } from "@/lib/game-ui";
 import { gameBadges } from "@/lib/game-badges";
 import { softNav } from "@/lib/soft-nav";
+import { useList } from "@/lib/user-lists";
 
 type Tile = { id: string; label: string; count: number; dot: string; search: string };
 
@@ -20,6 +21,7 @@ const arrow = (
 // bấm là cuộn xuống Kho game và lọc ngay. Số liệu tự tính từ games.json, không cần sửa tay.
 export default function QuickAccess({ games }: { games: GameCardData[] }) {
   const pathname = usePathname();
+  const favCount = useList("fav").length;
   if (games.length === 0) return null;
 
   const engines = Array.from(new Set(games.map((g) => g.engine)));
@@ -35,6 +37,7 @@ export default function QuickAccess({ games }: { games: GameCardData[] }) {
       dot: engineColor(e), search: `?engine=${encodeURIComponent(e)}`,
     })),
     ...(vh > 0 ? [{ id: "vh", label: "Việt hóa", count: vh, dot: "#2dd4bf", search: `?tag=${encodeURIComponent("Việt hóa")}` }] : []),
+    ...(favCount > 0 ? [{ id: "fav", label: "Yêu thích của bạn", count: favCount, dot: "#ff6b98", search: "?list=fav" }] : []),
     ...(cheat > 0 ? [{ id: "cheat", label: "Có Cheat", count: cheat, dot: "#fbbf24", search: "?tag=Cheat" }] : []),
   ];
   const hasDiscord = /^https?:\/\//i.test(site.discord);

@@ -8,6 +8,8 @@ import { gameBadges, isBadgeTag } from "@/lib/game-badges";
 import Cover from "@/components/Cover";
 import DownloadPanel from "@/components/DownloadPanel";
 import EngineChip from "@/components/EngineChip";
+import FavoriteButton from "@/components/FavoriteButton";
+import ViewTracker from "@/components/ViewTracker";
 import ExpandableContent from "@/components/ExpandableContent";
 import { AdultChip, PatchChip } from "@/components/GameBadges";
 import Gallery from "@/components/Gallery";
@@ -61,6 +63,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
   return (
     // --accent / --accent2 / --on-accent của game này: nút tải, glow, viền chip bên trong đều lấy từ đây
     <main style={accentStyle(game)}>
+      <ViewTracker slug={game.slug} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       {/* Hero: ảnh CHÍNH rõ nét bên phải, bị "che" dần bằng lớp tối từ trái sang và từ dưới lên */}
       <section className="relative isolate -mt-14 flex min-h-[560px] md:min-h-[min(82vh,760px)] items-end overflow-hidden">
@@ -114,6 +117,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
 
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <DownloadPanel links={game.links} title={game.title} />
+            <FavoriteButton slug={game.slug} variant="pill" />
             {game.images.length > 0 && (
               <a href="#hinh-anh" className="glass rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15">
                 Xem hình ảnh
