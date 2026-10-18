@@ -118,6 +118,11 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <DownloadPanel links={game.links} title={game.title} />
             <FavoriteButton slug={game.slug} variant="pill" />
+            {/^https?:\/\//i.test(site.reportUrl) && (
+              <a href={site.reportUrl} target="_blank" rel="noopener noreferrer" className="glass rounded-full px-6 py-3 font-semibold transition duration-300 hover:bg-white/15">
+                Báo link lỗi
+              </a>
+            )}
             {game.images.length > 0 && (
               <a href="#hinh-anh" className="glass rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15">
                 Xem hình ảnh

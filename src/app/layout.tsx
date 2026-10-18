@@ -6,6 +6,7 @@ import AccountMenu from "@/components/AccountMenu";
 import AgeGate from "@/components/AgeGate";
 import BackToTop from "@/components/BackToTop";
 import Brand from "@/components/Brand";
+import FavSync from "@/components/FavSync";
 import Footer from "@/components/Footer";
 import NavLinks from "@/components/NavLinks";
 import ReloadReset from "@/components/ReloadReset";
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="vi" className={`${display.variable} ${sans.variable}`}>
       <body className="flex min-h-dvh flex-col font-sans antialiased">
         <ReloadReset />
+        <FavSync />
         {site.ageGate.enabled && <AgeGate />}
         <header id="site-header" className="sticky top-4 z-40 px-4">
           <div className="glass edge mx-auto flex h-14 max-w-6xl items-center gap-2 rounded-full pl-3 pr-2 shadow-lg shadow-black/20">
