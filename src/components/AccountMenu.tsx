@@ -44,7 +44,7 @@ export default function AccountMenu() {
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label={`Tài khoản ${name}`}
               className="flex h-10 items-center gap-2 rounded-full bg-white/10 pl-1.5 pr-3 text-sm transition hover:bg-white/[0.16] sm:pr-4">
-        <span aria-hidden className="grid size-7 place-items-center rounded-full bg-gradient-to-br from-berry to-[#7c5cff] text-xs font-bold uppercase text-ink">
+        <span aria-hidden className="grid size-7 place-items-center rounded-full bg-berry text-xs font-bold uppercase text-ink">
           {name.slice(0, 1)}
         </span>
         <span className="hidden max-w-[8rem] truncate sm:inline">{name}</span>

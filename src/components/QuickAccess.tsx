@@ -53,7 +53,7 @@ export default function QuickAccess({ games }: { games: GameCardData[] }) {
         {tiles.map((t) => (
           <li key={t.id}>
             <Link href={`/${t.search}#kho-game`} onClick={(e) => softNav(e, pathname, t.search, "library")}
-                  className="glass group flex h-full items-center justify-between gap-3 rounded-2xl px-5 py-4 transition duration-300 hover:-translate-y-0.5 hover:bg-white/10 active:scale-[0.98]">
+                  className="glass group flex h-full items-center justify-between gap-3 rounded-2xl px-5 py-4 transition duration-300 hover:bg-white/10 active:scale-[0.98]">
               <span className="min-w-0">
                 <span className="flex items-center gap-2 text-sm text-haze">
                   <i aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: t.dot, boxShadow: `0 0 10px ${t.dot}` }} />
@@ -71,7 +71,7 @@ export default function QuickAccess({ games }: { games: GameCardData[] }) {
         {hasDiscord && (
           <li className="col-span-2 sm:col-span-1">
             <a href={site.discord} target="_blank" rel="noopener noreferrer"
-               className="group relative flex h-full items-center justify-between gap-3 overflow-hidden rounded-2xl border border-white/10 px-5 py-4 transition duration-300 hover:-translate-y-0.5 active:scale-[0.98]"
+               className="group relative flex h-full items-center justify-between gap-3 overflow-hidden rounded-2xl border border-white/10 px-5 py-4 transition duration-300 active:scale-[0.98]"
                style={{ background: "linear-gradient(135deg, rgba(124,92,255,0.34), rgba(255,107,152,0.2)), rgba(30,24,56,0.84)" }}>
               <span className="min-w-0">
                 <span className="block font-display text-lg font-bold tracking-tight">{site.nav.discord}</span>

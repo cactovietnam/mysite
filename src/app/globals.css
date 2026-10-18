@@ -22,48 +22,21 @@ body {
   color: var(--color-mist);
 }
 
-/* Nền phát sáng: lớp fixed riêng (nhẹ hơn nhiều so với background-attachment: fixed, nhất là trên điện thoại) */
-body::before {
-  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background-image:
-    radial-gradient(60rem 38rem at 88% -8%, rgba(255, 107, 152, 0.14), transparent 62%),
-    radial-gradient(52rem 40rem at -8% 6%, rgba(124, 92, 255, 0.18), transparent 62%),
-    radial-gradient(46rem 34rem at 52% 108%, rgba(45, 212, 191, 0.08), transparent 62%);
-}
-
-/* Hạt nhiễu (film grain): SVG feTurbulence 160px lặp lại, 4% độ đặc. Nằm dưới header (z-40) và popup (z-50+), không chặn chuột. */
-body::after {
-  content: ""; position: fixed; inset: 0; z-index: 30; pointer-events: none; opacity: 0.04;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
 ::selection { background: var(--color-berry); color: var(--color-ink); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
-/* Kính mờ: chỉ làm mờ thật (backdrop-filter) trên máy tính có chuột. Điện thoại dùng nền đặc hơn để cuộn mượt. */
+/* Panel: nền đặc, viền mảnh, không blur. */
 .glass {
-  background: rgba(30, 24, 56, 0.84);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: #17132a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
-@media (min-width: 768px) and (hover: hover) {
-  .glass {
-    background: rgba(30, 24, 56, 0.62);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
-  }
-}
-/* Viền gradient 1px quanh header: tách khỏi nền mà không cần thêm blur */
+/* Viền 1px quanh header */
 .edge { position: relative; }
-.edge::before {
-  content: ""; position: absolute; inset: 0; padding: 1px; border-radius: inherit; pointer-events: none;
-  background: linear-gradient(115deg, rgba(255,255,255,0.28), rgba(255,255,255,0.04) 35%, rgba(124,92,255,0.38) 70%, rgba(255,107,152,0.5));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
-}
+.edge::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; border: 1px solid rgba(255,255,255,0.1); }
 
 /* Huy hiệu nhỏ (tag): không bao giờ làm mờ nền, vì có thể có hàng chục cái */
 .chip {
-  background: rgba(30, 24, 56, 0.78);
+  background: #17132a;
   border: 1px solid rgba(255, 255, 255, 0.09);
 }
 

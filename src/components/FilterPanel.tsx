@@ -34,7 +34,7 @@ export default function FilterPanel({ filters, tagIndex, dirty, onChange, onClea
     onChange({ tags: chosen.has(label) ? filters.tags.filter((t) => t !== label) : [...filters.tags, label] });
 
   return (
-    <section aria-label="Bộ lọc game" className={`glass divide-y divide-white/10 rounded-[1.75rem] ${className}`}>
+    <section aria-label="Bộ lọc game" className={`glass divide-y divide-white/10 rounded-xl ${className}`}>
       <div className="flex items-center justify-between gap-3 px-5 py-4">
         <h2 className="font-display text-lg font-bold tracking-tight">Bộ lọc</h2>
         {dirty && (

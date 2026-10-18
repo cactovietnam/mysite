@@ -114,7 +114,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
             {list.length > shown.length && (
               <div className="mt-8 flex flex-col items-center gap-2">
                 <button type="button" onClick={() => setMore({ key: search, n: limit + PAGE })}
-                        className="glass rounded-full px-7 py-3 text-sm font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15 active:scale-95">
+                        className="glass rounded-full px-7 py-3 text-sm font-semibold transition duration-300 hover:bg-white/15 active:scale-95">
                   Xem thêm ({list.length - shown.length} game)
                 </button>
                 <p className="text-xs text-haze">Đang hiện {shown.length}/{list.length}</p>
@@ -122,13 +122,13 @@ export default function Library({ games }: { games: GameCardData[] }) {
             )}
           </>
         ) : (
-          <div className="glass grid place-items-center rounded-[1.75rem] px-6 py-14 text-center">
+          <div className="glass grid place-items-center rounded-xl px-6 py-14 text-center">
             <EmptyArt />
             <p className="mt-4 font-display text-xl font-bold">Không có game nào khớp bộ lọc</p>
             <p className="mt-2 max-w-[40ch] text-sm text-haze">{filters.list === "fav" ? "Bấm biểu tượng tim trên thẻ game để lưu vào đây." : filters.list === "seen" ? "Game bạn mở xem sẽ hiện ở đây." : "Thử bỏ bớt tag, đổi sang \u201cHoặc\u201d hoặc gõ tên khác."}</p>
             {dirty && (
               <button type="button" onClick={clear}
-                      className="mt-6 rounded-full bg-berry px-6 py-2.5 text-sm font-semibold text-ink transition hover:-translate-y-0.5 active:scale-95">
+                      className="mt-6 rounded-lg bg-berry px-6 py-2.5 text-sm font-semibold text-ink transition active:scale-95">
                 Xóa bộ lọc
               </button>
             )}

@@ -46,7 +46,7 @@ export default function AgeGate() {
       <div className="grid min-h-full place-items-center p-4">
         <div ref={ref} data-focus-root tabIndex={-1} role="dialog" aria-modal="true"
              aria-labelledby="age-title" aria-describedby="age-desc"
-             className="anim-pop w-full max-w-4xl overflow-hidden rounded-[2rem] border border-white/10 bg-plum shadow-2xl shadow-black/50 outline-none md:grid md:grid-cols-[5fr_7fr]">
+             className="anim-pop w-full max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-plum shadow-2xl shadow-black/50 outline-none md:grid md:grid-cols-[5fr_7fr]">
 
           <div aria-hidden className="grid place-items-center px-6 py-8 md:py-12"
                style={{ backgroundImage: "radial-gradient(70% 60% at 50% 45%, rgba(255,107,152,0.28), transparent 70%)" }}>
@@ -86,7 +86,7 @@ export default function AgeGate() {
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <button type="button" onClick={accept} disabled={!agreed}
-                      className="rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:translate-y-0 sm:flex-1">
+                      className="rounded-lg bg-berry px-7 py-3.5 font-semibold text-ink transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:translate-y-0 sm:flex-1">
                 Vào {site.name}
               </button>
               <a href="https://www.google.com"
