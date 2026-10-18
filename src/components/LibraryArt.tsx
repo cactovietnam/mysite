@@ -5,8 +5,8 @@ const PAD =
 // Ô giữ chỗ cạnh game thật khi kho mới có 1-2 game: lưới không trông trống trải
 export function GhostCard() {
   return (
-    <div aria-hidden className="rounded-2xl p-2">
-      <div className="grid aspect-video place-items-center rounded-xl border border-dashed border-white/15 bg-white/[0.025]">
+    <div aria-hidden className="rounded-[1.9rem] p-2">
+      <div className="grid aspect-video place-items-center rounded-[1.5rem] border border-dashed border-white/15 bg-white/[0.025]">
         <div className="text-center text-haze">
           <svg viewBox="0 0 48 32" className="mx-auto h-9 w-14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d={PAD} /><path d="M13 12v6M10 15h6" /><circle cx="31" cy="13" r="1.2" /><circle cx="36" cy="17" r="1.2" />

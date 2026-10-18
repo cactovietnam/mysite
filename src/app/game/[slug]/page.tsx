@@ -119,7 +119,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
             <DownloadPanel links={game.links} title={game.title} />
             <FavoriteButton slug={game.slug} variant="pill" />
             {game.images.length > 0 && (
-              <a href="#hinh-anh" className="glass rounded-full px-6 py-3 font-semibold transition duration-300 hover:bg-white/15">
+              <a href="#hinh-anh" className="glass rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15">
                 Xem hình ảnh
               </a>
             )}
@@ -129,7 +129,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
 
       <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-24 pt-6 lg:grid-cols-[340px_1fr] lg:gap-12">
         <aside className="order-2 space-y-8 lg:order-1">
-          <dl className="glass divide-y divide-white/10 rounded-xl px-5">
+          <dl className="glass divide-y divide-white/10 rounded-[1.75rem] px-5">
             {[
               ["Engine", game.engine],
               ["Phiên bản", game.version],

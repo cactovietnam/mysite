@@ -22,7 +22,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
       <p className="mt-4 text-haze">Có thể web vừa được cập nhật hoặc mạng bị gián đoạn. Thử lại, nếu vẫn lỗi thì tải lại cả trang.</p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <button onClick={reset}
-                className="rounded-lg bg-berry px-7 py-3.5 font-semibold text-ink transition active:scale-95">
+                className="rounded-full bg-berry px-7 py-3.5 font-semibold text-ink transition hover:-translate-y-0.5 active:scale-95">
           Thử lại
         </button>
         <button onClick={() => window.location.reload()}

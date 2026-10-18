@@ -16,7 +16,8 @@ export default function HowTo() {
 
       <ol className="grid gap-4 md:grid-cols-3">
         {STEPS.map((s, i) => (
-          <li key={s.title} className="glass relative overflow-hidden rounded-xl p-6">
+          <li key={s.title} className="glass relative overflow-hidden rounded-[1.75rem] p-6">
+            <span aria-hidden className="absolute -right-2 -top-4 select-none font-display text-8xl font-extrabold text-white/[0.06]">{i + 1}</span>
             <span className="grid size-9 place-items-center rounded-full bg-berry/15 font-display text-sm font-bold text-berry">{i + 1}</span>
             <h3 className="mt-4 font-display text-xl font-bold tracking-tight">{s.title}</h3>
             <p className="mt-2 leading-relaxed text-haze">{s.text}</p>
@@ -25,7 +26,7 @@ export default function HowTo() {
       </ol>
 
       {hasDiscord && (
-        <div className="glass relative mt-4 flex flex-col items-start justify-between gap-5 overflow-hidden rounded-2xl p-7 sm:flex-row sm:items-center sm:p-8">
+        <div className="glass relative mt-4 flex flex-col items-start justify-between gap-5 overflow-hidden rounded-[2rem] p-7 sm:flex-row sm:items-center sm:p-8">
           <div aria-hidden className="pointer-events-none absolute inset-0"
                style={{ background: "radial-gradient(50% 120% at 100% 50%, rgba(124,92,255,0.28), transparent 70%), radial-gradient(40% 100% at 0% 0%, rgba(255,107,152,0.16), transparent 70%)" }} />
           <div className="relative">
@@ -33,7 +34,7 @@ export default function HowTo() {
             <p className="mt-1.5 text-haze">Vào Discord để hỏi nhanh và nhận thông báo khi có game mới.</p>
           </div>
           <a href={site.discord} target="_blank" rel="noopener noreferrer"
-             className="relative shrink-0 rounded-lg bg-berry px-7 py-3.5 font-semibold text-ink transition duration-300 active:scale-95">
+             className="relative shrink-0 rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition duration-300 hover:-translate-y-0.5 active:scale-95">
             {site.nav.discord}
           </a>
         </div>

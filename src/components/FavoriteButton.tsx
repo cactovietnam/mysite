@@ -14,7 +14,7 @@ export default function FavoriteButton({ slug, variant = "card" }: { slug: strin
   if (variant === "pill") {
     return (
       <button type="button" onClick={() => toggleFav(slug)} aria-pressed={on}
-              className={`glass inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold transition duration-300 hover:bg-white/15 active:scale-95 ${on ? "text-berry" : ""}`}>
+              className={`glass inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15 active:scale-95 ${on ? "text-berry" : ""}`}>
         {heart}{on ? "Đã yêu thích" : "Yêu thích"}
       </button>
     );

@@ -46,7 +46,7 @@ export default function DownloadPanel({ links, title }: { links: Game["links"]; 
   return (
     <>
       <button onClick={() => setOpen(true)}
-              className="group inline-flex items-center gap-3 rounded-lg bg-accent py-2.5 pl-7 pr-2.5 font-semibold text-on-accent transition duration-300 hover:active:scale-95">
+              className="group inline-flex items-center gap-3 rounded-full bg-accent py-2.5 pl-7 pr-2.5 font-semibold text-on-accent shadow-[0_14px_36px_-12px_var(--accent)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_-10px_var(--accent)] active:scale-95">
         Tải xuống
         <span className="grid size-9 place-items-center rounded-full bg-ink/15 transition duration-300 group-hover:translate-y-0.5 group-hover:bg-ink/25">
           <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -58,7 +58,7 @@ export default function DownloadPanel({ links, title }: { links: Game["links"]; 
       {open && createPortal(
         <div className="anim-fade fixed inset-0 z-50 grid place-items-center bg-ink/75 p-4 md:backdrop-blur-sm" onClick={() => setOpen(false)}>
           <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Link tải ${title}`}
-               className="glass anim-pop w-full max-w-md rounded-2xl p-5 shadow-2xl shadow-black/50"
+               className="glass anim-pop w-full max-w-md rounded-[2rem] p-5 shadow-2xl shadow-black/50"
                onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 px-1">
               <div>

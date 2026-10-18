@@ -24,7 +24,7 @@ export default function SimilarGames({ current, all }: { current: Game; all: Gam
         {list.map((g) => (
           <li key={g.slug}>
             <Link href={`/game/${g.slug}`}
-                  className="group flex items-center gap-3.5 rounded-xl bg-white/[0.05] p-2.5 transition duration-300 hover:translate-x-1 hover:bg-white/[0.1]">
+                  className="group flex items-center gap-3.5 rounded-[1.5rem] bg-white/[0.05] p-2.5 transition duration-300 hover:translate-x-1 hover:bg-white/[0.1]">
               <Cover src={thumbOf(g)} title={g.title} engine={g.engine}
                      className="h-[72px] w-14 shrink-0 rounded-2xl object-cover" />
               <span className="min-w-0">
