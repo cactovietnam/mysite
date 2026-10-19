@@ -6,6 +6,8 @@ import { site } from "@/data/site";
 import { engineColor, fmtDate } from "@/lib/game-ui";
 import { gameBadges } from "@/lib/game-badges";
 import { softNav } from "@/lib/soft-nav";
+import { useList } from "@/lib/user-lists";
+import ReportMenu from "./ReportMenu";
 
 type Tile = { id: string; label: string; count: number; dot: string; search: string };
 
@@ -20,6 +22,7 @@ const arrow = (
 // bấm là cuộn xuống Kho game và lọc ngay. Số liệu tự tính từ games.json, không cần sửa tay.
 export default function QuickAccess({ games }: { games: GameCardData[] }) {
   const pathname = usePathname();
+  const favCount = useList("fav").filter((s) => games.some((g) => g.slug === s)).length; // bỏ qua game đã xóa
   if (games.length === 0) return null;
 
   const engines = Array.from(new Set(games.map((g) => g.engine)));
@@ -35,6 +38,7 @@ export default function QuickAccess({ games }: { games: GameCardData[] }) {
       dot: engineColor(e), search: `?engine=${encodeURIComponent(e)}`,
     })),
     ...(vh > 0 ? [{ id: "vh", label: "Việt hóa", count: vh, dot: "#2dd4bf", search: `?tag=${encodeURIComponent("Việt hóa")}` }] : []),
+    ...(favCount > 0 ? [{ id: "fav", label: "Yêu thích của bạn", count: favCount, dot: "#ff6b98", search: "?list=fav" }] : []),
     ...(cheat > 0 ? [{ id: "cheat", label: "Có Cheat", count: cheat, dot: "#fbbf24", search: "?tag=Cheat" }] : []),
   ];
   const hasDiscord = /^https?:\/\//i.test(site.discord);
@@ -66,32 +70,8 @@ export default function QuickAccess({ games }: { games: GameCardData[] }) {
           </li>
         ))}
 
-        {hasDiscord && (
-          <li className="col-span-2 sm:col-span-1">
-            <a href={site.discord} target="_blank" rel="noopener noreferrer"
-               className="group relative flex h-full items-center justify-between gap-3 overflow-hidden rounded-2xl border border-white/10 px-5 py-4 transition duration-300 hover:-translate-y-0.5 active:scale-[0.98]"
-               style={{ background: "linear-gradient(135deg, rgba(124,92,255,0.34), rgba(255,107,152,0.2)), rgba(30,24,56,0.84)" }}>
-              <span className="min-w-0">
-                <span className="block font-display text-lg font-bold tracking-tight">{site.nav.discord}</span>
-                <span className="mt-0.5 block text-xs leading-snug text-mist/75">Báo link lỗi, nhận tin game mới</span>
-              </span>
-              {arrow}
-            </a>
-          </li>
-        )}
-
-        {hasFacebook && (
-          <li className="col-span-2 sm:col-span-1">
-            <a href={site.facebook} target="_blank" rel="noopener noreferrer"
-               className="group relative flex h-full items-center justify-between gap-3 overflow-hidden rounded-2xl border border-white/10 px-5 py-4 transition duration-300 hover:-translate-y-0.5 active:scale-[0.98]"
-               style={{ background: "linear-gradient(135deg, rgba(24,119,242,0.34), rgba(124,92,255,0.2)), rgba(30,24,56,0.84)" }}>
-              <span className="min-w-0">
-                <span className="block font-display text-lg font-bold tracking-tight">{site.nav.facebook}</span>
-                <span className="mt-0.5 block text-xs leading-snug text-mist/75">Báo link lỗi, hỗ trợ trực tiếp</span>
-              </span>
-              {arrow}
-            </a>
-          </li>
+        {(hasDiscord || hasFacebook) && (
+          <li className="col-span-2 sm:col-span-1"><ReportMenu variant="tile" /></li>
         )}
       </ul>
     </section>

@@ -2,6 +2,7 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import type { GameCardData } from "@/data/games";
 import { site } from "@/data/site";
+import { useList } from "@/lib/user-lists";
 import { applyFilters, buildTagIndex, parseFilters, serializeFilters, type Filters } from "@/lib/library-filter";
 import FilterPanel from "./FilterPanel";
 import GameCard from "./GameCard";
@@ -26,14 +27,24 @@ export default function Library({ games }: { games: GameCardData[] }) {
   const tagIndex = useMemo(() => buildTagIndex(games, PRESETS), [games]);
   const search = useSyncExternalStore(subscribe, getSearch, () => "");
   const filters = useMemo(() => parseFilters(search, engines, tagIndex), [search, engines, tagIndex]);
-  const list = useMemo(() => applyFilters(games, filters), [games, filters]);
+  const fav = useList("fav");
+  const alive = (l: string[]) => l.filter((s) => games.some((g) => g.slug === s)).length; // bỏ qua game đã xóa
+  const seen = useList("seen");
+  const list = useMemo(() => {
+    const out = applyFilters(games, filters);
+    if (filters.list === "all") return out;
+    const keep = filters.list === "fav" ? fav : seen; // thứ tự trong danh sách = mới nhất trước
+    const rank = new Map(keep.map((s, i) => [s, i]));
+    const hit = out.filter((g) => rank.has(g.slug));
+    return filters.list === "seen" ? hit.sort((a, b) => rank.get(a.slug)! - rank.get(b.slug)!) : hit;
+  }, [games, filters, fav, seen]);
   const [panelOpen, setPanelOpen] = useState(false); // chỉ dùng trên điện thoại/tablet
   // Số game đang hiện gắn với query hiện tại: đổi bộ lọc/sắp xếp thì tự về PAGE mà không cần effect.
   const [more, setMore] = useState({ key: "", n: PAGE });
   const limit = more.key === search ? more.n : PAGE;
   const shown = list.slice(0, limit);
 
-  const dirty = filters.engine !== null || filters.q.trim() !== "" || filters.tags.length > 0;
+  const dirty = filters.list !== "all" || filters.engine !== null || filters.q.trim() !== "" || filters.tags.length > 0;
   const badge = filters.tags.length + (filters.q.trim() ? 1 : 0);
 
   // replace=true cho ô gõ chữ: không đẩy mỗi phím vào lịch sử Back
@@ -43,7 +54,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
     window.history[replace ? "replaceState" : "pushState"](null, "", url);
     window.dispatchEvent(new Event(EVENT));
   };
-  const clear = () => update({ engine: null, q: "", tags: [] });
+  const clear = () => update({ engine: null, q: "", tags: [], list: "all" });
 
   const chip = (id: string, label: string, count: number) => {
     const on = (filters.engine ?? "all") === id;
@@ -76,6 +87,16 @@ export default function Library({ games }: { games: GameCardData[] }) {
           <div className="flex flex-wrap gap-2.5">
             {chip("all", "Tất cả", games.length)}
             {engines.map((e) => chip(e, e, games.filter((g) => g.engine === e).length))}
+            {([["fav", "Yêu thích", alive(fav)], ["seen", "Đã xem", alive(seen)]] as const).map(([k, label, n]) => {
+              const on = filters.list === k;
+              return (
+                <button key={k} onClick={() => update({ list: on ? "all" : k })} aria-pressed={on}
+                        className={`rounded-full px-4 py-2 text-sm font-medium transition duration-300 ${
+                          on ? "bg-berry text-ink" : "glass text-mist/80 hover:bg-white/10 hover:text-mist"}`}>
+                  {label} <span className={on ? "text-ink/60" : "text-haze"}>{n}</span>
+                </button>
+              );
+            })}
           </div>
           <p aria-live="polite" className="text-sm text-haze">{list.length} game</p>
         </div>
@@ -105,7 +126,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
           <div className="glass grid place-items-center rounded-[1.75rem] px-6 py-14 text-center">
             <EmptyArt />
             <p className="mt-4 font-display text-xl font-bold">Không có game nào khớp bộ lọc</p>
-            <p className="mt-2 max-w-[40ch] text-sm text-haze">Thử bỏ bớt tag, đổi sang &ldquo;Hoặc&rdquo; hoặc gõ tên khác.</p>
+            <p className="mt-2 max-w-[40ch] text-sm text-haze">{filters.list === "fav" ? "Bấm biểu tượng tim trên thẻ game để lưu vào đây." : filters.list === "seen" ? "Game bạn mở xem sẽ hiện ở đây." : "Thử bỏ bớt tag, đổi sang \u201cHoặc\u201d hoặc gõ tên khác."}</p>
             {dirty && (
               <button type="button" onClick={clear}
                       className="mt-6 rounded-full bg-berry px-6 py-2.5 text-sm font-semibold text-ink transition hover:-translate-y-0.5 active:scale-95">

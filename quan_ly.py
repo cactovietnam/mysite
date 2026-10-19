@@ -9,7 +9,7 @@ Mọi ảnh thêm vào đều được đóng dấu logo (logo/logo-xanh.png, t�
 import base64, colorsys, datetime, hashlib, importlib, io, json, os, re, secrets, shutil, subprocess, sys, unicodedata
 import urllib.error, urllib.parse, urllib.request
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "src" / "data" / "games.json"
@@ -71,8 +71,8 @@ SITE_FIELDS = [
     ("name", "Tên website", "req"),
     ("url", "Địa chỉ website (https://...)", "url_req"),
     ("description", "Mô tả website (SEO)", "text"),
-    ("discord", "Link Discord (trống = ẩn nút)", "url"),
-    ("facebook", "Link Facebook hỗ trợ (trống = ẩn nút)", "url"),
+    ("discord", "Link Discord, hiện trong nút Báo lỗi (trống = ẩn)", "url"),
+    ("facebook", "Link Facebook, hiện trong nút Báo lỗi (trống = ẩn)", "url"),
     ("footer", "Dòng chân trang", "text"),
     ("nav.explore", "Menu: chữ 'Khám phá'", "text"),
     ("nav.discord", "Menu: chữ nút Discord", "text"),
@@ -786,6 +786,15 @@ def do_edit_game():
     save(games); print("  ✓ Đã lưu.")
     return True
 
+def drop_favorites(slugs):
+    """Game bị xóa thì xóa luôn yêu thích của nó trên Supabase. Chưa có .env.local thì bỏ qua (web tự bỏ qua slug không còn game)."""
+    if not slugs or not ENV_FILE.exists(): return
+    try:
+        sb_call("DELETE", "/rest/v1/favorites?slug=in.(" + ",".join(quote(x, safe="-") for x in slugs) + ")", prefer="return=minimal")
+        print("  ✓ Đã dọn yêu thích của các game này trên Supabase.")
+    except Exception as e:
+        print(f"  ! Chưa dọn được yêu thích trên Supabase ({e}). Không ảnh hưởng web, chỉ còn dòng thừa trong bảng favorites.")
+
 def do_delete_games():
     games = load()
     print("\nGame:"); show_games(games)
@@ -794,10 +803,12 @@ def do_delete_games():
     names = ", ".join(games[i - 1]["title"] for i in gi)
     if input(f"Xóa vĩnh viễn: {names}? Gõ 'xoa' để xác nhận: ").strip().lower() != "xoa":
         print("  Đã hủy."); return False
+    gone = [games[i - 1]["slug"] for i in gi]
     for i in sorted(gi, reverse=True):
         shutil.rmtree(COVERS / games[i - 1]["slug"], ignore_errors=True)
         games.pop(i - 1)
     save(games); print("  ✓ Đã xóa.")
+    drop_favorites(gone)
     return True
 
 
