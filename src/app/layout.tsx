@@ -9,6 +9,7 @@ import Brand from "@/components/Brand";
 import Footer from "@/components/Footer";
 import NavLinks from "@/components/NavLinks";
 import ReloadReset from "@/components/ReloadReset";
+import ClientErrorReporter from "@/components/ClientErrorReporter";
 import { games } from "@/data/games";
 import { site, siteUrl } from "@/data/site";
 
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="vi" className={`${display.variable} ${sans.variable}`}>
       <body className="flex min-h-dvh flex-col font-sans antialiased">
+        <ClientErrorReporter />
         <ReloadReset />
         {site.ageGate.enabled && <AgeGate />}
         <header id="site-header" className="sticky top-4 z-40 px-4">
@@ -54,3 +56,4 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
+

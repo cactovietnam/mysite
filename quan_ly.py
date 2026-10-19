@@ -6,7 +6,8 @@ Chạy:  python quan_ly.py   (đặt file này trong thư mục mysite)
   - Ảnh BỔ SUNG (tối đa 10): ảnh trong game để người xem hiểu thêm.
 Mọi ảnh thêm vào đều được đóng dấu logo (logo/logo-xanh.png, tự tách nền xanh lá). Chỉnh góc/cỡ ở các hằng WM_*.
 """
-import base64, colorsys, datetime, hashlib, importlib, io, json, os, re, shutil, subprocess, sys, unicodedata
+import base64, colorsys, datetime, hashlib, importlib, io, json, os, re, secrets, shutil, subprocess, sys, unicodedata
+import urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -50,8 +51,9 @@ SITE_DEFAULT = {
     "url": "https://mysite.vercel.app",
     "description": "Danh sách game và hướng dẫn cài đặt.",
     "discord": "https://discord.gg/",
+    "facebook": "https://www.facebook.com/profile.php?id=61591215583142",
     "footer": "© 2026 MySite",
-    "nav": {"explore": "Khám phá", "discord": "Discord"},
+    "nav": {"explore": "Khám phá", "discord": "Discord", "facebook": "Facebook"},
     "home": {"libraryTitle": "Kho game", "featuredBadge": "Mới cập nhật", "featuredButton": "Xem game", "sliderSeconds": 6,
              "announcement": "Chào mừng bạn đến MySite! Cùng khám phá game và những bản mới cập nhật.",
              "announcementLabel": "Thông báo"},
@@ -70,9 +72,11 @@ SITE_FIELDS = [
     ("url", "Địa chỉ website (https://...)", "url_req"),
     ("description", "Mô tả website (SEO)", "text"),
     ("discord", "Link Discord (trống = ẩn nút)", "url"),
+    ("facebook", "Link Facebook hỗ trợ (trống = ẩn nút)", "url"),
     ("footer", "Dòng chân trang", "text"),
     ("nav.explore", "Menu: chữ 'Khám phá'", "text"),
     ("nav.discord", "Menu: chữ nút Discord", "text"),
+    ("nav.facebook", "Menu: chữ nút Facebook", "text"),
     ("home.libraryTitle", "Tiêu đề kho game", "text"),
     ("home.featuredBadge", "Nhãn game mới cập nhật", "text"),
     ("home.featuredButton", "Chữ nút 'Xem game'", "text"),
@@ -892,7 +896,7 @@ def ensure_gitignore():
     gi = ROOT / ".gitignore"
     text = gi.read_text(encoding="utf-8") if gi.exists() else ""
     have = {l.strip() for l in text.splitlines()}
-    add = [x for x in ("anh-moi/", "anh-goc/", "backup/", "__pycache__/") if x not in have]
+    add = [x for x in ("anh-moi/", "anh-goc/", "backup/", "__pycache__/", ".env.local") if x not in have]
     if add:
         gi.write_text(text.rstrip("\n") + ("\n" if text else "") + "\n# quan_ly.py\n" + "\n".join(add) + "\n", encoding="utf-8")
         print(f"  (Đã thêm vào .gitignore: {', '.join(add)})")
@@ -978,6 +982,297 @@ def do_check():
     return False
 
 
+# ---------- CMD 7: cài đặt lưu trên Supabase (báo lỗi Discord, khóa đăng nhập, tài khoản) ----------
+# Cần NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY trong file .env.local (nằm NGOÀI git).
+# Khóa service_role có toàn quyền với database: tool từ chối chạy nếu git không bỏ qua file đó.
+ENV_FILE = ROOT / ".env.local"
+NIL_UUID = "00000000-0000-0000-0000-000000000000"   # admin_id ghi vào nhật ký khi thao tác từ tool này
+PASSWORD_MIN, PASSWORD_MAX = 8, 12                   # phải khớp src/lib/auth-validate.ts
+PW_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"   # bỏ ký tự dễ nhầm 0/O, 1/l/I
+ALERTS_DEFAULT = {"discord": True, "dedupeSeconds": 300, "webhookUrl": ""}
+AUTH_DEFAULT = {"maxAttempts": 5, "lockMinutes": 30}
+WEBHOOK_RE = re.compile(r"^https://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api/webhooks/\d+/[\w-]+$")   # khớp src/lib/notify.ts
+NAME_RE = re.compile(r"^[A-Za-z0-9_]{0,12}$")
+UA = "quan_ly.py/1.0 (DiscordBot; +https://discord.com)"   # Discord/Cloudflare chặn User-Agent mặc định của Python
+
+_sb = None
+
+def _read_env():
+    out = {}
+    if ENV_FILE.exists():
+        for line in ENV_FILE.read_text(encoding="utf-8-sig").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                out[k.strip()] = v.strip().strip('"').strip("'")
+    return out
+
+def sb_config():
+    """(url, khóa) hoặc None. Không bao giờ in khóa ra màn hình."""
+    global _sb
+    if _sb: return _sb
+    env = _read_env()
+    url = (env.get("NEXT_PUBLIC_SUPABASE_URL") or env.get("SUPABASE_URL") or "").rstrip("/")
+    key = env.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not (url and key):
+        print("\n  ! Chưa có khóa Supabase. Tạo file .env.local cạnh quan_ly.py (file này KHÔNG được lên GitHub) với 2 dòng:")
+        print("      NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co")
+        print("      SUPABASE_SERVICE_ROLE_KEY=khóa service_role / secret (Supabase -> Project Settings -> API Keys)")
+        return None
+    if has_git():
+        if run("git", "ls-files", "--", ".env.local").stdout.strip():
+            print("\n  ✗ .env.local đang được git theo dõi: khóa có thể ĐÃ LÊN GITHUB.")
+            print("    Chạy: git rm --cached .env.local   rồi vào Supabase TẠO LẠI khóa (đổi khóa cũ), sau đó thử lại.")
+            return None
+        if run("git", "check-ignore", "-q", ".env.local").returncode != 0:
+            print("\n  ✗ Git không bỏ qua .env.local, tool từ chối chạy để khóa không bị đẩy lên GitHub.")
+            print("    Thêm dòng  .env.local  vào file .gitignore (khởi động lại tool cũng tự thêm), rồi thử lại.")
+            return None
+    _sb = (url, key)
+    return _sb
+
+def sb_call(method, path, body=None, prefer=None):
+    cfg = sb_config()
+    if not cfg: raise RuntimeError("Chưa cấu hình khóa Supabase (.env.local).")
+    url, key = cfg
+    headers = {"apikey": key, "Content-Type": "application/json", "User-Agent": UA}
+    if key.startswith("eyJ"): headers["Authorization"] = f"Bearer {key}"   # khóa kiểu cũ là JWT; khóa "sb_secret_..." chỉ đi qua apikey
+    if prefer: headers["Prefer"] = prefer
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(url + path, data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            raw = r.read().decode("utf-8")
+            return json.loads(raw) if raw else None
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Supabase trả lỗi {e.code}: {e.read().decode('utf-8', 'replace')[:300]}") from None
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Không kết nối được Supabase: {e.reason}") from None
+
+def _ts(s):
+    """Chuỗi thời gian của Supabase -> datetime (chịu được số chữ số thập phân bất kỳ)."""
+    return datetime.datetime.fromisoformat(re.sub(r"\.(\d+)", lambda m: "." + m[1][:6].ljust(6, "0"), s.replace("Z", "+00:00")))
+
+def _now(): return datetime.datetime.now(datetime.timezone.utc)
+
+def get_setting(key, default):
+    rows = sb_call("GET", f"/rest/v1/app_settings?key=eq.{key}&select=value")
+    return merge(default, rows[0]["value"]) if rows and isinstance(rows[0].get("value"), dict) else dict(default)
+
+def put_setting(key, value):
+    sb_call("POST", "/rest/v1/app_settings?on_conflict=key", {"key": key, "value": value, "updated_at": _now().isoformat()},
+            prefer="resolution=merge-duplicates,return=minimal")
+
+def _int_in(label, lo, hi, cur):
+    v = input(f"  {label} [{cur}]\n  Giá trị mới ({lo}-{hi}; Enter = giữ): ").strip()
+    if not v: return None
+    if not v.isdigit() or not lo <= int(v) <= hi:
+        print(f"  ! Chỉ nhận số nguyên {lo}-{hi}."); return None
+    return int(v)
+
+# --- [2] báo lỗi về Discord ---
+def _mask(url): return re.sub(r"(/webhooks/\d+/).+", r"\1********", url)
+
+def test_via_site():
+    base = (load_site().get("url") or "").rstrip("/")
+    if not base.startswith("http"):
+        print("  ! Chưa có địa chỉ website: vào mục [1] -> 'Địa chỉ website'."); return
+    body = json.dumps({"message": f"Thử từ quan_ly.py lúc {datetime.datetime.now():%H:%M:%S}", "path": "/quan_ly-thu"}).encode()
+    req = urllib.request.Request(base + "/api/report-error", data=body, method="POST", headers={"Content-Type": "application/json", "User-Agent": UA})
+    try:
+        with urllib.request.urlopen(req, timeout=25) as r: status = r.status
+    except urllib.error.HTTPError as e: status = e.code
+    except urllib.error.URLError as e: print(f"  ✗ Không kết nối được {base}: {e.reason}"); return
+    if status == 404: print("  ✗ Web chưa có bản mới (thiếu /api/report-error). Hãy đẩy lên bằng [9] rồi thử lại."); return
+    if status == 429: print("  ! Gửi quá nhanh, đợi 1 phút rồi thử lại."); return
+    if status != 204: print(f"  ✗ Web trả mã {status}."); return
+    rows = sb_call("GET", "/rest/v1/error_logs?select=notified&order=created_at.desc&limit=1") or []
+    res = (rows[0]["notified"] if rows else {}).get("discord") or ("bỏ qua vì trùng lỗi vừa báo" if rows and rows[0]["notified"].get("skipped") else "?")
+    hint = {"ok": "ĐÃ GỬI, kiểm tra kênh Discord", "no_config": "CHƯA CÓ WEBHOOK (đặt ở mục 2 hoặc biến DISCORD_WEBHOOK_URL trên Vercel)",
+            "disabled": "đang TẮT (mục 1)", "error": "lỗi mạng khi gửi"}.get(res, f"Discord từ chối ({res}), webhook có thể sai/đã xóa" if res.startswith("http_") else res)
+    print(f"  Kết quả kênh Discord: {hint}")
+
+def test_webhook(hook):
+    if not hook: print("  ! Chưa lưu webhook ở mục 2."); return
+    req = urllib.request.Request(hook, method="POST", headers={"Content-Type": "application/json", "User-Agent": UA},
+                                 data=json.dumps({"content": "Thử webhook từ quan_ly.py", "allowed_mentions": {"parse": []}}).encode())
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r: print("  ✓ Discord nhận được, kiểm tra kênh." if r.status in (200, 204) else f"  ! Mã {r.status}")
+    except urllib.error.HTTPError as e: print(f"  ✗ Discord từ chối (mã {e.code}): webhook sai hoặc đã bị xóa.")
+    except urllib.error.URLError as e: print(f"  ✗ Không kết nối được: {e.reason}")
+
+def do_alerts():
+    s = get_setting("error_alerts", ALERTS_DEFAULT)
+    while True:
+        hook = s.get("webhookUrl") or ""
+        print("\n--- BÁO LỖI VỀ DISCORD (có hiệu lực trong ~30 giây, không cần đẩy lên Vercel) ---")
+        print(f"  1. Báo lỗi tự động: {'Bật' if s['discord'] else 'Tắt'}")
+        print(f"  2. Webhook Discord: {_mask(hook) if hook else '(chưa đặt ở đây: web dùng biến DISCORD_WEBHOOK_URL trên Vercel)'}")
+        print(f"  3. Chống trùng: {s['dedupeSeconds']} giây (cùng một lỗi trong khoảng này chỉ báo 1 lần; 0 = báo mọi lần)")
+        print("  4. Gửi thử một lỗi qua web thật (kiểm tra cả chuỗi Vercel -> Discord)")
+        print("  5. Gửi thử thẳng tới webhook đã lưu ở mục 2")
+        c = input("Số mục (Enter = xong): ").strip()
+        if not c: return
+        if c == "1": s["discord"] = not s["discord"]
+        elif c == "2":
+            v = input("  Dán webhook mới (Enter = giữ, '-' = xóa, quay về dùng biến trên Vercel): ").strip()
+            if not v: continue
+            if v == "-": s["webhookUrl"] = ""
+            elif WEBHOOK_RE.match(v): s["webhookUrl"] = v
+            else: print("  ! Không đúng dạng webhook Discord (https://discord.com/api/webhooks/số/mã)."); continue
+        elif c == "3":
+            n = _int_in("Chống trùng (giây)", 0, 86400, s["dedupeSeconds"])
+            if n is None: continue
+            s["dedupeSeconds"] = n
+        elif c == "4": test_via_site(); continue
+        elif c == "5": test_webhook(hook); continue
+        else: continue
+        put_setting("error_alerts", s); print("  ✓ Đã lưu.")
+
+# --- [3] khóa đăng nhập ---
+def do_auth_settings():
+    s = get_setting("auth", AUTH_DEFAULT)
+    while True:
+        lm = s["lockMinutes"]
+        print("\n--- KHÓA ĐĂNG NHẬP (có hiệu lực trong ~30 giây) ---")
+        print(f"  1. Số lần nhập sai tối đa: {s['maxAttempts']} (sai tới lần này thì khóa đăng nhập tài khoản đó)")
+        print(f"  2. Thời gian khóa: {'đến khi admin mở khóa' if lm == 0 else f'{lm} phút (tự mở lại)'}   [0 = đến khi admin mở khóa]")
+        c = input("Số mục (Enter = xong): ").strip()
+        if not c: return
+        if c == "1": n = _int_in("Số lần sai tối đa", 1, 20, s["maxAttempts"]); key = "maxAttempts"
+        elif c == "2": n = _int_in("Số phút khóa", 0, 10080, s["lockMinutes"]); key = "lockMinutes"
+        else: continue
+        if n is None: continue
+        s[key] = n; put_setting("auth", s); print("  ✓ Đã lưu.")
+
+# --- [4] quản lý tài khoản ---
+def _lock_state(s, lock_min):
+    """Giống hàm login_begin trong DB: quá lock_min phút kể từ lúc khóa/lần thử cuối thì bộ đếm coi như làm lại."""
+    if not s: return {"failed": 0, "locked": False}
+    if lock_min > 0 and _ts(s["locked_at"] or s["updated_at"]) < _now() - datetime.timedelta(minutes=lock_min):
+        return {"failed": 0, "locked": False}
+    return {"failed": s["failed_attempts"], "locked": bool(s["locked_at"])}
+
+def _decorate(profs):
+    if not profs: return []
+    lock_min = get_setting("auth", AUTH_DEFAULT)["lockMinutes"]
+    names = ",".join(p["username"].lower() for p in profs)
+    states = {s["username_lc"]: s for s in sb_call("GET", f"/rest/v1/login_state?username_lc=in.({names})&select=username_lc,failed_attempts,locked_at,updated_at") or []}
+    admins = {a["user_id"] for a in sb_call("GET", "/rest/v1/admins?select=user_id&user_id=in.(" + ",".join(p["id"] for p in profs) + ")") or []}
+    return [{"id": p["id"], "username": p["username"], "isAdmin": p["id"] in admins, **_lock_state(states.get(p["username"].lower()), lock_min)} for p in profs]
+
+def _status(a): return "ĐANG BỊ KHÓA" if a["locked"] else f"đã sai {a['failed']} lần" if a["failed"] else "bình thường"
+
+def audit(action, uid, name):
+    try: sb_call("POST", "/rest/v1/admin_audit", {"admin_id": NIL_UUID, "action": "cli:" + action, "target_id": uid, "target_username": name}, prefer="return=minimal")
+    except RuntimeError as e: print(f"  (Không ghi được nhật ký: {e})")
+
+def unlock_name(name, uid=None):
+    sb_call("DELETE", f"/rest/v1/login_state?username_lc=eq.{name.lower()}")
+    audit("unlock", uid, name); print(f"  ✓ Đã mở khóa {name}.")
+
+def reset_password(a):
+    if a["isAdmin"] and input("  Đây là tài khoản quản trị. Vẫn đổi mật khẩu? (y/N): ").strip().lower() != "y": return
+    while True:
+        pw = input(f"  Mật khẩu mới ({PASSWORD_MIN}-{PASSWORD_MAX} ký tự; Enter = tạo ngẫu nhiên; 0 = hủy): ").strip()
+        if pw == "0": return
+        if not pw: pw = "".join(secrets.choice(PW_ALPHABET) for _ in range(10))
+        elif not PASSWORD_MIN <= len(pw) <= PASSWORD_MAX: print(f"  ! Mật khẩu cần {PASSWORD_MIN}-{PASSWORD_MAX} ký tự."); continue
+        break
+    sb_call("PUT", f"/auth/v1/admin/users/{a['id']}", {"password": pw})
+    sb_call("POST", "/rest/v1/rpc/admin_revoke_sessions", {"p_user": a["id"]})   # đá mọi thiết bị đang dùng mật khẩu cũ
+    sb_call("DELETE", f"/rest/v1/login_state?username_lc=eq.{a['username'].lower()}")
+    audit("reset-password", a["id"], a["username"]); a.update(failed=0, locked=False)
+    print(f"  ✓ Đã đổi mật khẩu cho {a['username']}; mọi thiết bị đã bị đăng xuất, khóa (nếu có) đã gỡ.")
+    print(f"    Mật khẩu mới: {pw}    (chỉ hiện lần này, hãy gửi cho họ)")
+
+def toggle_admin(a):
+    if a["isAdmin"]:
+        if input(f"  Gỡ quyền quản trị của {a['username']}? (y/N): ").strip().lower() != "y": return
+        sb_call("DELETE", f"/rest/v1/admins?user_id=eq.{a['id']}"); a["isAdmin"] = False; audit("revoke-admin", a["id"], a["username"])
+        print(f"  ✓ Đã gỡ quyền quản trị của {a['username']}.")
+    else:
+        sb_call("POST", "/rest/v1/admins", {"user_id": a["id"]}, prefer="resolution=ignore-duplicates,return=minimal")
+        a["isAdmin"] = True; audit("grant-admin", a["id"], a["username"])
+        print(f"  ✓ {a['username']} đã là quản trị viên (vào /quan-tri/tai-khoan trên web).")
+
+def account_actions(a):
+    while True:
+        print(f"\n  Tài khoản: {a['username']} ({_status(a)}{', quản trị viên' if a['isAdmin'] else ''})")
+        print(f"   [1] Mở khóa đăng nhập\n   [2] Đổi mật khẩu\n   [3] {'Gỡ quyền quản trị' if a['isAdmin'] else 'Cấp quyền quản trị'}\n   [0] Quay lại")
+        c = input("  Chọn: ").strip()
+        if c == "1": unlock_name(a["username"], a["id"]); a.update(failed=0, locked=False)
+        elif c == "2": reset_password(a)
+        elif c == "3": toggle_admin(a)
+        else: return
+
+def pick_account(rows):
+    if not rows: print("  (Không có tài khoản nào.)"); return
+    for i, a in enumerate(rows, 1):
+        print(f"  {i:>2}. {a['username']:<14} {_status(a)}" + ("   [quản trị]" if a["isAdmin"] else ""))
+    ni = ask_nums("Số tài khoản cần thao tác (Enter = quay lại): ", len(rows))
+    if ni: account_actions(rows[ni[0] - 1])
+
+def list_locked():
+    lock_min = get_setting("auth", AUTH_DEFAULT)["lockMinutes"]
+    rows = sb_call("GET", "/rest/v1/login_state?locked_at=not.is.null&select=username_lc,failed_attempts,locked_at,updated_at&order=locked_at.desc&limit=50") or []
+    rows = [r for r in rows if _lock_state(r, lock_min)["locked"]]
+    if not rows: print("  Không có tài khoản nào đang bị khóa."); return
+    for i, r in enumerate(rows, 1): print(f"  {i:>2}. {r['username_lc']:<14} khóa lúc {_ts(r['locked_at']).astimezone():%d/%m %H:%M}")
+    for i in ask_nums("Số cần mở khóa (all = mở hết; Enter = quay lại): ", len(rows)): unlock_name(rows[i - 1]["username_lc"])
+
+def do_accounts():
+    while True:
+        print("\n--- QUẢN LÝ TÀI KHOẢN ---\n [1] Tìm tài khoản theo tên\n [2] Tài khoản đang bị khóa đăng nhập\n [3] Danh sách quản trị viên\n [0] Quay lại")
+        c = input("Chọn: ").strip()
+        if c == "1":
+            q = input("Tên cần tìm (Enter = 20 tài khoản đầu): ").strip()
+            if not NAME_RE.match(q): print("  ! Chỉ gồm chữ không dấu, số, gạch dưới (tối đa 12 ký tự)."); continue
+            path = "/rest/v1/profiles?select=id,username&order=username.asc&limit=20"
+            if q: path += "&username=ilike.*" + urllib.parse.quote(q.replace("_", "\\_"), safe="") + "*"   # "_" là ký tự đại diện của LIKE: thoát nó
+            pick_account(_decorate(sb_call("GET", path) or []))
+        elif c == "2": list_locked()
+        elif c == "3":
+            ids = [r["user_id"] for r in sb_call("GET", "/rest/v1/admins?select=user_id") or []]
+            if not ids: print("  Chưa có quản trị viên nào. Hãy tìm tài khoản của bạn (mục 1) rồi chọn 'Cấp quyền quản trị'."); continue
+            pick_account(_decorate(sb_call("GET", "/rest/v1/profiles?select=id,username&order=username.asc&id=in.(" + ",".join(ids) + ")") or []))
+        else: return
+
+# --- [5] lỗi gần nhất ---
+def do_errors():
+    rows = sb_call("GET", "/rest/v1/error_logs?select=created_at,source,path,message,alerted&order=created_at.desc&limit=10") or []
+    if not rows: print("  Chưa có lỗi nào được ghi."); return
+    for r in rows:
+        when = _ts(r["created_at"]).astimezone()
+        msg = " ".join(r["message"].split())[:90]
+        print(f"  {when:%d/%m %H:%M}  {'trình duyệt' if r['source'] == 'client' else 'máy chủ':<11} {'đã báo' if r['alerted'] else 'chưa báo':<8} {r['path'] or '-'}\n      {msg}")
+
+# --- menu cmd 7 ---
+CMD7_MENU = """
+=== CMD 7: CÀI ĐẶT WEB & TÀI KHOẢN ===
+ [1] Chữ & link trên web (tên web, Discord, Facebook, chân trang, menu...)   -> cần đẩy lên Vercel [9]
+ [2] Báo lỗi về Discord (bật/tắt, webhook, chống trùng, gửi thử)             -> có hiệu lực ngay
+ [3] Khóa đăng nhập (số lần sai tối đa, thời gian khóa)                      -> có hiệu lực ngay
+ [4] Quản lý tài khoản (tìm, mở khóa, đổi mật khẩu, quyền quản trị)
+ [5] Xem 10 lỗi hệ thống gần nhất
+ [0] Quay lại"""
+
+def do_cmd7():
+    handlers = {"2": do_alerts, "3": do_auth_settings, "4": do_accounts, "5": do_errors}
+    changed = False
+    while True:
+        print(CMD7_MENU)
+        try: c = input("Chọn: ").strip()
+        except EOFError: return changed
+        try:
+            if c == "1": changed |= bool(do_site())
+            elif c in handlers:
+                if sb_config(): handlers[c]()
+            elif c == "0": return changed
+        except RuntimeError as e: print(f"\n  ✗ {e}")
+        except EOFError: return changed
+
+
 MENU = """
 === MYSITE ===
  [1] Thêm game mới (kèm bước thêm ảnh)
@@ -986,7 +1281,7 @@ MENU = """
  [4] Thêm / đổi ảnh (ảnh chính + ảnh bổ sung)
  [5] Đổi ảnh chính / xóa ảnh bổ sung
  [6] Xóa game
- [7] Chữ & link trên web (tên web, Discord, chân trang, menu...)
+ [7] Cài đặt web & tài khoản (chữ/link, báo lỗi Discord, khóa đăng nhập, quản lý tài khoản)
  [8] Kiểm tra lỗi (ảnh thiếu, link sai, git bỏ qua ảnh)
  [9] Đẩy lên Vercel
  [0] Thoát"""
@@ -999,8 +1294,14 @@ def main():
     ensure_gitignore()
     if not SITE.exists():
         write_json(SITE, SITE_DEFAULT); print("  (Đã tạo src/data/site.json)")
+    else:
+        s = read_json(SITE, {})
+        if "facebook" not in s or "facebook" not in s.get("nav", {}):  # nâng cấp site.json cũ: web đọc thẳng file này nên khóa phải có sẵn
+            s.setdefault("facebook", SITE_DEFAULT["facebook"])
+            s.setdefault("nav", {}).setdefault("facebook", "Facebook")
+            write_json(SITE, s); print("  (Đã thêm link Facebook vào src/data/site.json)")
     actions = {"1": do_add_game, "2": do_edit_game, "3": do_links, "4": do_images, "5": do_manage_images,
-               "6": do_delete_games, "7": do_site, "8": do_check}
+               "6": do_delete_games, "7": do_cmd7, "8": do_check}
     changed = False
     while True:
         print(MENU)

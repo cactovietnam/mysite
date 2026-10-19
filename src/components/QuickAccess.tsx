@@ -38,6 +38,7 @@ export default function QuickAccess({ games }: { games: GameCardData[] }) {
     ...(cheat > 0 ? [{ id: "cheat", label: "Có Cheat", count: cheat, dot: "#fbbf24", search: "?tag=Cheat" }] : []),
   ];
   const hasDiscord = /^https?:\/\//i.test(site.discord);
+  const hasFacebook = /^https?:\/\//i.test(site.facebook);
 
   return (
     <section aria-label="Khám phá nhanh" className="mx-auto mt-4 max-w-6xl px-4">
@@ -73,6 +74,20 @@ export default function QuickAccess({ games }: { games: GameCardData[] }) {
               <span className="min-w-0">
                 <span className="block font-display text-lg font-bold tracking-tight">{site.nav.discord}</span>
                 <span className="mt-0.5 block text-xs leading-snug text-mist/75">Báo link lỗi, nhận tin game mới</span>
+              </span>
+              {arrow}
+            </a>
+          </li>
+        )}
+
+        {hasFacebook && (
+          <li className="col-span-2 sm:col-span-1">
+            <a href={site.facebook} target="_blank" rel="noopener noreferrer"
+               className="group relative flex h-full items-center justify-between gap-3 overflow-hidden rounded-2xl border border-white/10 px-5 py-4 transition duration-300 hover:-translate-y-0.5 active:scale-[0.98]"
+               style={{ background: "linear-gradient(135deg, rgba(24,119,242,0.34), rgba(124,92,255,0.2)), rgba(30,24,56,0.84)" }}>
+              <span className="min-w-0">
+                <span className="block font-display text-lg font-bold tracking-tight">{site.nav.facebook}</span>
+                <span className="mt-0.5 block text-xs leading-snug text-mist/75">Báo link lỗi, hỗ trợ trực tiếp</span>
               </span>
               {arrow}
             </a>

@@ -47,3 +47,6 @@ __pycache__/
 
 # quan_ly.py
 anh-goc/
+
+# quan_ly.py
+.env.local

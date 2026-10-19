@@ -6,7 +6,8 @@
   "footer": "© 2026 GSVH",
   "nav": {
     "explore": "Khám phá",
-    "discord": "Discord"
+    "discord": "Discord",
+    "facebook": "Facebook"
   },
   "home": {
     "libraryTitle": "Kho game",
@@ -70,5 +71,6 @@
     "Erotic",
     "NSFW",
     "No AI"
-  ]
+  ],
+  "facebook": "https://www.facebook.com/profile.php?id=61591215583142"
 }

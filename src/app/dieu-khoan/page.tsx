@@ -25,9 +25,9 @@ export default function Terms() {
       <section>
         <h2 id="bao-mat" className={h2}>Chính sách bảo mật</h2>
         <ul className={ul}>
-          <li>Chúng tôi lưu tên đăng nhập, email và mật khẩu. Mật khẩu được băm, không ai (kể cả chúng tôi) đọc được bản gốc.</li>
-          <li>Email chỉ dùng để xác nhận tài khoản, đặt lại mật khẩu và thông báo liên quan đến tài khoản.</li>
-          <li>Dữ liệu tài khoản do Supabase lưu trữ; Cloudflare Turnstile dùng để chống bot khi đăng ký/đăng nhập; email do nhà cung cấp gửi thư của chúng tôi chuyển đi.</li>
+          <li>Chúng tôi chỉ lưu tên tài khoản và mật khẩu. Mật khẩu được băm, không ai (kể cả chúng tôi) đọc được bản gốc. Chúng tôi không thu thập email.</li>
+          <li>Quên mật khẩu: liên hệ quản trị viên qua Facebook của {site.name}, chúng tôi sẽ xác minh và đặt lại giúp bạn.</li>
+          <li>Dữ liệu tài khoản do Supabase lưu trữ; Cloudflare Turnstile dùng để chống bot khi đăng ký/đăng nhập.</li>
           <li>Chúng tôi không bán dữ liệu của bạn cho bên thứ ba.</li>
           <li>Muốn xóa tài khoản hoặc dữ liệu: liên hệ qua Discord của {site.name}.</li>
         </ul>

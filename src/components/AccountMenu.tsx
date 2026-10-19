@@ -2,10 +2,12 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { authConfigured, getSupabase } from "@/lib/supabase";
-import { useAuthUser } from "@/lib/auth-store";
+import { displayName, useAuthUser } from "@/lib/auth-store";
 
-// Nút tài khoản trên header: chưa đăng nhập -> "Đăng nhập"; đã đăng nhập -> chữ cái đầu + menu Đăng xuất.
-// Chưa cấu hình Supabase thì không hiện gì (web chạy như cũ).
+const item = "block w-full rounded-xl px-3 py-2 text-left text-sm text-mist/90 transition hover:bg-white/10";
+
+// Cạnh nút Tìm kiếm trên header. Chưa đăng nhập: nút 3 gạch, bấm ra Đăng nhập / Đăng ký.
+// Đã đăng nhập: chữ cái đầu + tên, bấm ra menu Đăng xuất. Chưa cấu hình Supabase thì không hiện gì (web chạy như cũ).
 export default function AccountMenu() {
   const user = useAuthUser();
   const [open, setOpen] = useState(false);
@@ -24,42 +26,43 @@ export default function AccountMenu() {
   // Chưa biết trạng thái: giữ chỗ để header không giật khi hydrate xong
   if (user === undefined) return <span aria-hidden className="h-10 w-10 sm:w-[7.5rem]" />;
 
-  if (!user) {
-    return (
-      <Link href="/dang-nhap" aria-label="Đăng nhập"
-            className="flex h-10 items-center gap-2 rounded-full bg-berry px-3 text-sm font-semibold text-ink transition hover:brightness-110 active:scale-95 sm:px-4">
-        <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <circle cx="10" cy="7" r="3.2" /><path d="M3.5 17c.8-3 3.3-4.6 6.5-4.6s5.7 1.6 6.5 4.6" />
-        </svg>
-        <span className="hidden sm:inline">Đăng nhập</span>
-      </Link>
-    );
-  }
-
-  // user_metadata do chính người dùng sửa được: chỉ dùng để hiển thị, tuyệt đối không dùng để phân quyền.
-  const meta = user.user_metadata as { username?: unknown } | undefined;
-  const name = typeof meta?.username === "string" && meta.username ? meta.username : (user.email ?? "Tài khoản");
+  const name = user ? displayName(user) : "";
 
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label={`Tài khoản ${name}`}
-              className="flex h-10 items-center gap-2 rounded-full bg-white/10 pl-1.5 pr-3 text-sm transition hover:bg-white/[0.16] sm:pr-4">
-        <span aria-hidden className="grid size-7 place-items-center rounded-full bg-gradient-to-br from-berry to-[#7c5cff] text-xs font-bold uppercase text-ink">
-          {name.slice(0, 1)}
-        </span>
-        <span className="hidden max-w-[8rem] truncate sm:inline">{name}</span>
-      </button>
+      {user ? (
+        <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label={`Tài khoản ${name}`}
+                className="flex h-10 items-center gap-2 rounded-full bg-white/10 pl-1.5 pr-3 text-sm transition hover:bg-white/[0.16] sm:pr-4">
+          <span aria-hidden className="grid size-7 place-items-center rounded-full bg-gradient-to-br from-berry to-[#7c5cff] text-xs font-bold uppercase text-ink">
+            {name.slice(0, 1)}
+          </span>
+          <span className="hidden max-w-[8rem] truncate sm:inline">{name}</span>
+        </button>
+      ) : (
+        <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label="Menu tài khoản"
+                className="grid size-10 place-items-center rounded-full bg-white/10 transition hover:bg-white/[0.16] active:scale-95">
+          <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+            {open ? <path d="m5 5 10 10M15 5 5 15" /> : <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" />}
+          </svg>
+        </button>
+      )}
+
       {open && (
-        <div role="menu" className="anim-pop absolute right-0 top-12 z-50 w-60 rounded-2xl border border-white/10 bg-plum p-2 shadow-2xl shadow-black/50">
-          <div className="px-3 py-2">
-            <p className="truncate text-sm font-semibold">{name}</p>
-            {user.email && <p className="truncate text-xs text-haze">{user.email}</p>}
-          </div>
-          <button type="button" role="menuitem"
-                  onClick={() => { setOpen(false); void getSupabase()?.auth.signOut(); }}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm text-mist/90 transition hover:bg-white/10">
-            Đăng xuất
-          </button>
+        <div role="menu" className="anim-pop absolute right-0 top-12 z-50 w-56 rounded-2xl border border-white/10 bg-plum p-2 shadow-2xl shadow-black/50">
+          {user ? (
+            <>
+              <p className="truncate px-3 py-2 text-sm font-semibold">{name}</p>
+              <button type="button" role="menuitem" className={item}
+                      onClick={() => { setOpen(false); void getSupabase()?.auth.signOut(); }}>
+                Đăng xuất
+              </button>
+            </>
+          ) : (
+            <>
+              <Link href="/dang-nhap" role="menuitem" onClick={() => setOpen(false)} className={item}>Đăng nhập</Link>
+              <Link href="/dang-ky" role="menuitem" onClick={() => setOpen(false)} className={item}>Đăng ký</Link>
+            </>
+          )}
         </div>
       )}
     </div>

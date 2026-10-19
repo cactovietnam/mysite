@@ -33,3 +33,9 @@ const subscribe = (cb: () => void) => {
 export const useAuthUser = () => useSyncExternalStore(subscribe, () => user, () => undefined);
 export const useRecovery = () => useSyncExternalStore(subscribe, () => recovery, () => false);
 export const clearRecovery = () => { recovery = false; emit(); };
+
+// Tên hiển thị lấy từ user_metadata (người dùng tự sửa được): chỉ để hiển thị, tuyệt đối không dùng để phân quyền.
+export const displayName = (u: User): string => {
+  const n = (u.user_metadata as { username?: unknown } | undefined)?.username;
+  return typeof n === "string" && n ? n : "Tài khoản";
+};
