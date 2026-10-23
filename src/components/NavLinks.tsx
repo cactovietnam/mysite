@@ -2,16 +2,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { site } from "@/data/site";
+import { donateConfig, donateNavLabel } from "@/data/donate";
 import { softNav } from "@/lib/soft-nav";
 
 const tab =
   "relative flex h-14 shrink-0 items-center px-3.5 text-sm font-medium transition-colors after:absolute after:inset-x-3 after:bottom-2 after:h-0.5 after:origin-center after:rounded-full after:bg-gradient-to-r after:from-berry after:to-[#7c5cff] after:transition-transform after:duration-300";
 const idle = "text-mist/70 after:scale-x-0 hover:text-mist hover:after:scale-x-100";
 const active = "text-mist after:scale-x-100";
+// Tab Donate: chữ + icon màu berry, gạch chân sáng lên khi đang ở /donate hoặc rê chuột.
+const donateTab = "gap-1.5 font-semibold text-berry hover:after:scale-x-100";
 
 export default function NavLinks({ engines }: { engines: string[] }) {
   const pathname = usePathname();
   const home = pathname === "/";
+  const isDonate = pathname === "/donate";
 
   return (
     <nav aria-label="Chính" className="hidden min-w-0 flex-1 justify-center overflow-x-auto [scrollbar-width:none] md:flex">
@@ -30,6 +34,15 @@ export default function NavLinks({ engines }: { engines: string[] }) {
           </Link>
         );
       })}
+      {donateConfig.enabled && (
+        <Link href="/donate" aria-current={isDonate ? "page" : undefined}
+              className={`${tab} ${donateTab} ${isDonate ? "after:scale-x-100" : "after:scale-x-0"}`}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2Z" />
+          </svg>
+          {donateNavLabel}
+        </Link>
+      )}
     </nav>
   );
 }

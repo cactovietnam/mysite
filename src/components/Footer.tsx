@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { site } from "@/data/site";
+import { donateConfig, donateNavLabel } from "@/data/donate";
 import Brand from "./Brand";
 import HomeLink from "./HomeLink";
 
@@ -24,6 +25,7 @@ export default function Footer() {
               <li><HomeLink className={link}>{site.nav.explore}</HomeLink></li>
               <li><Link href="/#kho-game" className={link}>{site.home.libraryTitle}</Link></li>
               <li><Link href="/#huong-dan" className={link}>Cách tải và chơi</Link></li>
+              {donateConfig.enabled && <li><Link href="/donate" className={link}>Ủng hộ ({donateNavLabel})</Link></li>}
             </ul>
           </nav>
 

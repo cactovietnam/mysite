@@ -6,7 +6,7 @@ Chạy:  python quan_ly.py   (đặt file này trong thư mục mysite)
   - Ảnh BỔ SUNG (tối đa 10): ảnh trong game để người xem hiểu thêm.
 Mọi ảnh thêm vào đều được đóng dấu logo (logo/logo-xanh.png, tự tách nền xanh lá). Chỉnh góc/cỡ ở các hằng WM_*.
 """
-import base64, colorsys, datetime, hashlib, importlib, io, json, os, re, secrets, shutil, subprocess, sys, unicodedata
+import base64, colorsys, datetime, fnmatch, hashlib, importlib, io, json, os, re, secrets, shutil, subprocess, sys, unicodedata
 import urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 from urllib.parse import quote, urlparse
@@ -36,7 +36,7 @@ THUMB_W = 640       # ảnh nhỏ cho thẻ game / ô tìm kiếm / game tương
 # git: PUSH_ALL = True -> mục [9] đẩy MỌI thay đổi (code web + dữ liệu + ảnh), trừ file trong .gitignore.
 #      PUSH_ALL = False -> chỉ đẩy PUSH_PATHS, code web đang sửa dở KHÔNG bị kéo theo vào commit.
 PUSH_ALL = True
-PUSH_PATHS = ("src/data", "public/covers", ".gitignore")
+PUSH_PATHS = ("src/data", "public/covers", "public/donate-qr.*", ".gitignore")
 
 # --- đóng dấu logo lên mọi ảnh thêm vào (ảnh gốc trong anh-moi/ không bị sửa) ---
 WM_ON = True          # False = tắt đóng dấu
@@ -46,6 +46,20 @@ WM_MIN_W = 96         # nhưng không nhỏ hơn 96 px
 WM_MARGIN = 0.025     # cách mép = 2.5% chiều rộng ảnh
 WM_OPACITY = 0.9
 
+# Giá trị TƯỢNG TRƯNG: đổi bằng CMD 7 > [6]. STK toàn số 0 + tên ngân hàng mẫu => web không sinh QR giả.
+DONATE_DEFAULT = {
+    "enabled": True,
+    "title": "DONATE",
+    "subtitle": "Cùng tiếp sức cho những bản Việt hóa mới.",
+    "cardTitle": "Ủng hộ MySite",
+    "qrImage": "/donate-qr.png",
+    "qrNote": "Quét mã QR bằng ứng dụng ngân hàng để ủng hộ.",
+    "bankName": "TÊN NGÂN HÀNG",
+    "accountNumber": "0000000000",
+    "accountHolder": "TEN CHU TAI KHOAN",
+    "transferContent": "TÊN CỦA NGƯỜI GỬI",
+}
+
 SITE_DEFAULT = {
     "name": "MySite",
     "url": "https://mysite.vercel.app",
@@ -53,11 +67,13 @@ SITE_DEFAULT = {
     "discord": "https://discord.gg/",
     "facebook": "https://www.facebook.com/profile.php?id=61591215583142",
     "footer": "© 2026 MySite",
-    "nav": {"explore": "Khám phá", "discord": "Discord", "facebook": "Facebook"},
+    "tagline": "",
+    "nav": {"explore": "Khám phá", "discord": "Discord", "facebook": "Facebook", "donate": "DONATE"},
     "home": {"libraryTitle": "Kho game", "featuredBadge": "Mới cập nhật", "featuredButton": "Xem game", "sliderSeconds": 6,
              "announcement": "Chào mừng bạn đến MySite! Cùng khám phá game và những bản mới cập nhật.",
              "announcementLabel": "Thông báo"},
     "ageGate": {"enabled": True, "remember": "never"},
+    "donate": DONATE_DEFAULT,
     "engines": {"Ren'Py": "#fb923c", "RPGM": "#2dd4bf", "Unity": "#60a5fa", "Unreal": "#9ca3af"},
     "tagPresets": ["2DCG", "3DCG", "Animation", "Anime", "Visual Novel", "RPG", "Simulation", "Management", "Adventure",
                    "Puzzle", "Sandbox", "Action", "Turn-Based", "Fantasy", "Horror", "Comedy", "School Life",
@@ -73,6 +89,7 @@ SITE_FIELDS = [
     ("description", "Mô tả website (SEO)", "text"),
     ("discord", "Link Discord, hiện trong nút Báo lỗi (trống = ẩn)", "url"),
     ("facebook", "Link Facebook, hiện trong nút Báo lỗi (trống = ẩn)", "url"),
+    ("tagline", "Dòng giới thiệu ngắn cạnh logo to ở đầu trang (trống = ẩn)", "text"),
     ("footer", "Dòng chân trang", "text"),
     ("nav.explore", "Menu: chữ 'Khám phá'", "text"),
     ("nav.discord", "Menu: chữ nút Discord", "text"),
@@ -896,6 +913,90 @@ def do_site():
         print("  ✓ Đã lưu. Nhớ đẩy lên Vercel để web đổi theo.")
 
 
+# ---------- trang Donate ----------
+# (khóa trong site.json["donate"], nhãn, kiểu)
+DONATE_FIELDS = [
+    ("enabled", "Bật trang Donate (tắt = /donate trả 404, ẩn khỏi menu/footer/sitemap)", "bool"),
+    ("title", "Tiêu đề trang", "req"),
+    ("subtitle", "Mô tả phụ dưới tiêu đề", "text"),
+    ("cardTitle", "Tiêu đề khung", "text"),
+    ("qrImage", "Ảnh mã QR (kéo thả file vào đây để tự copy vào public/)", "qr"),
+    ("qrNote", "Dòng ghi chú dưới mã QR", "text"),
+    ("bankName", "Tên ngân hàng (nên dùng mã VietQR: Techcombank, VCB, MBBank...)", "text"),
+    ("accountNumber", "Số tài khoản (chỉ chữ số)", "stk"),
+    ("accountHolder", "Tên chủ tài khoản", "text"),
+    ("transferContent", "Nội dung chuyển khoản người gửi cần ghi", "text"),
+    ("@nav.donate", "Chữ trên menu", "text"),
+]
+
+def _donate_get(site, k):
+    return site["nav"].get("donate", "DONATE") if k == "@nav.donate" else site["donate"].get(k, "")
+
+def _donate_set(site, k, v):
+    if k == "@nav.donate": site["nav"]["donate"] = v
+    else: site["donate"][k] = v
+
+def _donate_warnings(site):
+    d = site["donate"]; w = []
+    if d["accountNumber"] and not re.fullmatch(r"\d{6,19}", d["accountNumber"]):
+        w.append("Số tài khoản không phải 6-19 chữ số: web sẽ không dùng được QR dự phòng VietQR.")
+    if d["accountNumber"] and set(d["accountNumber"]) == {"0"}:
+        w.append("Số tài khoản vẫn là giá trị mẫu (toàn số 0).")
+    q = d["qrImage"]
+    if q.startswith("/") and not (PUBLIC / q.lstrip("/")).exists():
+        w.append(f"Chưa có file public{q}: web sẽ dùng QR dự phòng VietQR (nếu STK/ngân hàng hợp lệ) hoặc hiện khung trống.")
+    return w
+
+def _import_qr(raw):
+    """Nhận đường dẫn file ảnh trên máy (hoặc /đường-dẫn-trong-public, hoặc https://...). Trả về giá trị qrImage mới hoặc None."""
+    raw = raw.strip().strip('"').strip("'")
+    if re.match(r"^https?://", raw, re.I) or raw.startswith("/"): return raw
+    p = Path(raw).expanduser()
+    if not p.is_file(): print("  ! Không thấy file này."); return None
+    if not is_image(p): print("  ! Không phải file ảnh."); return None
+    PUBLIC.mkdir(exist_ok=True)
+    ext = p.suffix.lower() if p.suffix.lower() in NATIVE else ".png"
+    dest = PUBLIC / f"donate-qr{ext}"
+    for old in PUBLIC.glob("donate-qr.*"):   # tên cố định, bỏ bản cũ khác đuôi
+        if old != dest: old.unlink(missing_ok=True)
+    if ext == p.suffix.lower(): shutil.copy2(p, dest)
+    elif Image is not None:
+        with Image.open(p) as im: im.convert("RGBA").save(dest, "PNG")
+    else: print("  ! Định dạng này cần Pillow để chuyển sang PNG."); return None
+    return f"/{dest.name}"
+
+def do_donate():
+    site = load_site(); changed = False
+    while True:
+        print("\n--- TRANG DONATE (Enter = xong) ---")
+        for i, (k, label, kind) in enumerate(DONATE_FIELDS, 1):
+            v = _donate_get(site, k)
+            print(f"  {i:>2}. {label}: {(('Bật' if v else 'Tắt') if kind == 'bool' else v) or '(trống)'}")
+        for m in _donate_warnings(site): print(f"  ⚠ {m}")
+        ni = ask_nums("Số mục cần sửa: ", len(DONATE_FIELDS))
+        if not ni: return changed
+        k, label, kind = DONATE_FIELDS[ni[0] - 1]
+        cur = _donate_get(site, k)
+        if kind == "bool":
+            _donate_set(site, k, not cur)
+        else:
+            hint = "Enter = giữ, '-' = để trống" if kind != "req" else "Enter = giữ"
+            v = input(f"  {label} [{cur}]\n  Giá trị mới ({hint}): ").strip()
+            if not v: continue
+            if v == "-":
+                if kind == "req": print("  ! Mục này không được để trống."); continue
+                v = ""
+            elif kind == "qr":
+                v = _import_qr(v)
+                if v is None: continue
+            elif kind == "stk":
+                v = re.sub(r"[\s.\-]", "", v)
+                if not v.isdigit(): print("  ! Số tài khoản chỉ gồm chữ số."); continue
+            _donate_set(site, k, v)
+        write_json(SITE, site); changed = True
+        print("  ✓ Đã lưu. Nhớ đẩy lên Vercel [9] để web đổi theo.")
+
+
 # ---------- git ----------
 def run(*cmd, stdin=None):
     return subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, encoding="utf-8", errors="replace", input=stdin)
@@ -917,7 +1018,7 @@ def ensure_gitignore():
 
 def _in_push_paths(porcelain_line):
     path = porcelain_line[3:].split(" -> ")[-1].strip().strip('"').replace("\\", "/")
-    return any(path == p or path.startswith(p.rstrip("/") + "/") for p in PUSH_PATHS)
+    return any(path == p or path.startswith(p.rstrip("/") + "/") or fnmatch.fnmatch(path, p) for p in PUSH_PATHS)
 
 def do_push():
     if not has_git():
@@ -1266,6 +1367,7 @@ CMD7_MENU = """
  [3] Khóa đăng nhập (số lần sai tối đa, thời gian khóa)                      -> có hiệu lực ngay
  [4] Quản lý tài khoản (tìm, mở khóa, đổi mật khẩu, quyền quản trị)
  [5] Xem 10 lỗi hệ thống gần nhất
+ [6] Trang Donate (QR, ngân hàng, STK, nội dung chuyển khoản)               -> cần đẩy lên Vercel [9]
  [0] Quay lại"""
 
 def do_cmd7():
@@ -1277,6 +1379,7 @@ def do_cmd7():
         except EOFError: return changed
         try:
             if c == "1": changed |= bool(do_site())
+            elif c == "6": changed |= bool(do_donate())
             elif c in handlers:
                 if sb_config(): handlers[c]()
             elif c == "0": return changed
@@ -1311,6 +1414,11 @@ def main():
             s.setdefault("facebook", SITE_DEFAULT["facebook"])
             s.setdefault("nav", {}).setdefault("facebook", "Facebook")
             write_json(SITE, s); print("  (Đã thêm link Facebook vào src/data/site.json)")
+    s = read_json(SITE, {})
+    if "donate" not in s or "donate" not in s.get("nav", {}):  # site.json cũ chưa có trang Donate: thêm giá trị mẫu
+        s.setdefault("donate", dict(DONATE_DEFAULT)).setdefault("cardTitle", DONATE_DEFAULT["cardTitle"])
+        s.setdefault("nav", {}).setdefault("donate", "DONATE")
+        write_json(SITE, s); print("  (Đã thêm mục Donate mẫu vào src/data/site.json, sửa ở CMD 7 > [6])")
     actions = {"1": do_add_game, "2": do_edit_game, "3": do_links, "4": do_images, "5": do_manage_images,
                "6": do_delete_games, "7": do_cmd7, "8": do_check}
     changed = False

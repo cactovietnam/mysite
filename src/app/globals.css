@@ -15,7 +15,6 @@
 }
 
 :root { color-scheme: dark; --accent: #ff6b98; --accent2: #7c5cff; --on-accent: #0f0c1a; }
-html { scroll-behavior: smooth; }
 
 body {
   background-color: var(--color-ink);
@@ -33,7 +32,7 @@ body::before {
 
 /* Hạt nhiễu (film grain): SVG feTurbulence 160px lặp lại, 4% độ đặc. Nằm dưới header (z-40) và popup (z-50+), không chặn chuột. */
 body::after {
-  content: ""; position: fixed; inset: 0; z-index: 30; pointer-events: none; opacity: 0.04;
+  content: ""; position: fixed; inset: 0; z-index: 30; pointer-events: none; opacity: 0.04; transform: translateZ(0); will-change: transform;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -76,7 +75,6 @@ body::after {
 .anim-fade { animation: fade 0.2s ease both; }
 
 @media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;

@@ -7,3 +7,7 @@ export const site = data;
 export const siteUrl = (() => {
   try { return new URL(data.url); } catch { return undefined; }
 })();
+
+// Trang Donate: đọc riêng ở ./donate; re-export để import cũ từ "@/data/site" vẫn chạy.
+export { donateConfig, donateNavLabel } from "./donate";
+export type { DonateConfig } from "./donate";
