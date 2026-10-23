@@ -3,7 +3,9 @@
   "url": "https://gsvhvn.vercel.app",
   "description": "Danh sách game và hướng dẫn cài đặt.",
   "discord": "https://discord.gg/",
+  "facebook": "https://www.facebook.com/profile.php?id=61591215583142",
   "footer": "© 2026 GSVH",
+  "tagline": "",
   "nav": {
     "explore": "Khám phá",
     "discord": "Discord",
@@ -21,6 +23,18 @@
   "ageGate": {
     "enabled": true,
     "remember": "never"
+  },
+  "donate": {
+    "enabled": true,
+    "title": "DONATE",
+    "subtitle": "Cùng tiếp sức cho những bản Việt hóa mới.",
+    "cardTitle": "Ủng hộ GSVH",
+    "qrImage": "/donate-qr.png",
+    "qrNote": "Quét mã QR bằng ứng dụng ngân hàng để ủng hộ.",
+    "bankName": "MBBank",
+    "accountNumber": "039903780868",
+    "accountHolder": "NGUYEN DINH NGUYEN",
+    "transferContent": "Ten nguoi gui + game muon dich"
   },
   "engines": {
     "Ren'Py": "#fb923c",
@@ -72,18 +86,5 @@
     "Erotic",
     "NSFW",
     "No AI"
-  ],
-  "facebook": "https://www.facebook.com/profile.php?id=61591215583142",
-  "donate": {
-    "enabled": true,
-    "title": "DONATE",
-    "subtitle": "Cùng tiếp sức cho những bản Việt hóa mới.",
-    "cardTitle": "Ủng hộ MySite",
-    "qrImage": "/donate-qr.png",
-    "qrNote": "Quét mã QR bằng ứng dụng ngân hàng để ủng hộ.",
-    "bankName": "TÊN NGÂN HÀNG",
-    "accountNumber": "0000000000",
-    "accountHolder": "TEN CHU TAI KHOAN",
-    "transferContent": "TÊN CỦA NGƯỜI GỬI"
-  }
+  ]
 }
