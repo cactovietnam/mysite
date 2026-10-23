@@ -19,7 +19,8 @@ function Logo({ id, className }: { id: keyof typeof LOGO; className: string }) {
 type Opt = { id: keyof typeof LOGO; name: string; url: string; note: string };
 
 // Nút "Báo lỗi": bấm vào hiện 2 lựa chọn Discord / Facebook (link lấy từ site.json, trống thì ẩn lựa chọn đó).
-// variant "tile": ô trong Khám phá nhanh. "pill": nút ở trang game.
+// variant "tile": chip trong Khám phá nhanh, 2 icon bấm thẳng tới Discord/Facebook (không qua popup).
+// variant "pill": nút ở trang game, vẫn mở popup để nhắc kèm tên game + link lỗi.
 export default function ReportMenu({ variant, game }: { variant: "tile" | "pill"; game?: string }) {
   const [open, setOpen] = useState(false);
   const modalRef = useModal(open, () => setOpen(false)); // khóa cuộn, nhốt Tab, Esc đóng, trả focus
@@ -33,21 +34,17 @@ export default function ReportMenu({ variant, game }: { variant: "tile" | "pill"
   return (
     <>
       {variant === "tile" ? (
-        <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog"
-                className="group relative flex h-full w-full items-center justify-between gap-3 overflow-hidden rounded-2xl border border-white/10 px-5 py-4 text-left transition duration-300 hover:-translate-y-0.5 active:scale-[0.98]"
-                style={{ background: "linear-gradient(135deg, rgba(88,101,242,0.34), rgba(24,119,242,0.2)), rgba(30,24,56,0.84)" }}>
-          <span className="min-w-0">
-            <span className="block font-display text-lg font-bold tracking-tight">Báo lỗi</span>
-            <span className="mt-0.5 block text-xs leading-snug text-mist/75">Qua {opts.map((o) => o.name).join(" hoặc ")}</span>
-          </span>
-          <span className="flex shrink-0 -space-x-2">
-            {opts.map((o) => (
-              <span key={o.id} className="grid size-8 place-items-center rounded-full text-white ring-2 ring-[#1b1535]" style={{ background: LOGO[o.id].color }}>
-                <Logo id={o.id} className="size-4" />
-              </span>
-            ))}
-          </span>
-        </button>
+        <div className="glass flex items-center gap-2 rounded-full py-1 pl-4 pr-1">
+          <span className="text-sm text-haze">Báo lỗi</span>
+          {opts.map((o) => (
+            <a key={o.id} href={o.url} target="_blank" rel="noopener noreferrer"
+               aria-label={`Báo lỗi qua ${o.name}`} title={o.name}
+               className="grid size-8 place-items-center rounded-full text-white transition duration-300 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+               style={{ background: LOGO[o.id].color }}>
+              <Logo id={o.id} className="size-4" />
+            </a>
+          ))}
+        </div>
       ) : (
         <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog"
                 className="glass rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15">
@@ -55,7 +52,7 @@ export default function ReportMenu({ variant, game }: { variant: "tile" | "pill"
         </button>
       )}
 
-      {open && createPortal(
+      {variant === "pill" && open && createPortal(
         <div className="anim-fade fixed inset-0 z-50 grid place-items-center bg-ink/75 p-4 md:backdrop-blur-sm" onClick={() => setOpen(false)}>
           <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Báo lỗi"
                className="glass anim-pop w-full max-w-md rounded-[2rem] p-5 shadow-2xl shadow-black/50"
