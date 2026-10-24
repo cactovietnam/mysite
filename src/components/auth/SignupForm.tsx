@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 import { authMessage } from "@/lib/auth-errors";
+import { takeReturnTo } from "@/lib/after-auth";
 import { PASSWORD_MAX, PASSWORD_MIN, USERNAME_MAX, toEmail, validatePassword, validateUsername } from "@/lib/auth-validate";
 import PasswordField from "./PasswordField";
 import Turnstile from "./Turnstile";
@@ -49,7 +50,7 @@ export default function SignupForm() {
         options: { data: { username: u }, captchaToken: token! },
       });
       if (err) { setError(authMessage(err)); return; }
-      router.replace(data.session ? "/" : "/dang-nhap"); // đã tắt "Confirm email" nên đăng ký xong có phiên đăng nhập luôn
+      router.replace(data.session ? takeReturnTo() : "/dang-nhap"); // đã tắt "Confirm email" nên đăng ký xong có phiên đăng nhập luôn
     } catch {
       setError("Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.");
     } finally {

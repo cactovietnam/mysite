@@ -117,7 +117,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           </dl>
 
           <div className="mt-7 flex flex-wrap items-center gap-3">
-            <DownloadPanel links={game.links} title={game.title} />
+            <DownloadPanel slug={game.slug} title={game.title} hasLinks={game.links.some((l) => /^https?:\/\//i.test(l.url))} />
             <FavoriteButton slug={game.slug} variant="pill" />
             <ReportMenu variant="pill" game={game.title} />
             {game.images.length > 0 && (

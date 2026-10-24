@@ -1338,13 +1338,31 @@ def list_locked():
     for i, r in enumerate(rows, 1): print(f"  {i:>2}. {r['username_lc']:<14} khóa lúc {_ts(r['locked_at']).astimezone():%d/%m %H:%M}")
     for i in ask_nums("Số cần mở khóa (all = mở hết; Enter = quay lại): ", len(rows)): unlock_name(rows[i - 1]["username_lc"])
 
+def export_accounts():
+    """Xuất TOÀN BỘ tên tài khoản ra file .txt: dòng đầu là tổng số, các dòng sau mỗi dòng một tên.
+    Lưu trong backup/ (đã bị git bỏ qua) để danh sách người dùng không bị đẩy lên GitHub."""
+    names, off = [], 0
+    while True:   # Supabase trả tối đa 1000 dòng mỗi lần: đọc từng lô cho tới khi hết
+        rows = sb_call("GET", f"/rest/v1/profiles?select=username&order=username.asc&limit=1000&offset={off}") or []
+        names += [r["username"] for r in rows]
+        if len(rows) < 1000: break
+        off += 1000
+    BACKUP.mkdir(exist_ok=True)
+    out = BACKUP / f"tai-khoan-{datetime.datetime.now():%Y%m%d-%H%M%S}.txt"
+    with open(out, "w", encoding="utf-8-sig", newline="\r\n") as f:   # BOM + CRLF: Notepad trên Windows đọc đúng
+        f.write(f"Tổng số tài khoản: {len(names)}\n" + "".join(n + "\n" for n in names))
+    print(f"  ✓ Đã xuất {len(names)} tài khoản ra file: {out}")
+
 def do_accounts():
     while True:
         print("\n--- QUẢN LÝ TÀI KHOẢN ---\n [1] Tìm tài khoản theo tên\n [2] Tài khoản đang bị khóa đăng nhập\n [3] Danh sách quản trị viên\n [0] Quay lại")
         c = input("Chọn: ").strip()
         if c == "1":
-            q = input("Tên cần tìm (Enter = 20 tài khoản đầu): ").strip()
+            q = input("Tên cần tìm (Enter để trống = xuất file .txt toàn bộ tên + hiện 20 tài khoản đầu): ").strip()
             if not NAME_RE.match(q): print("  ! Chỉ gồm chữ không dấu, số, gạch dưới (tối đa 12 ký tự)."); continue
+            if not q:   # ô trống: xuất file; có gõ tên thì chỉ tìm như bình thường
+                try: export_accounts()
+                except RuntimeError as e: print(f"  ✗ Không xuất được file: {e}")
             path = "/rest/v1/profiles?select=id,username&order=username.asc&limit=20"
             if q: path += "&username=ilike.*" + urllib.parse.quote(q.replace("_", "\\_"), safe="") + "*"   # "_" là ký tự đại diện của LIKE: thoát nó
             pick_account(_decorate(sb_call("GET", path) or []))

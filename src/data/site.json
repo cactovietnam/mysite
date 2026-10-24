@@ -36,6 +36,11 @@
     "accountHolder": "NGUYEN DINH NGUYEN",
     "transferContent": "Ten nguoi gui + game muon dich"
   },
+  "popup": {
+    "enabled": true,
+    "title": "Thông báo",
+    "text": ""
+  },
   "engines": {
     "Ren'Py": "#fb923c",
     "RPGM": "#2dd4bf",
@@ -86,10 +91,5 @@
     "Erotic",
     "NSFW",
     "No AI"
-  ],
-  "popup": {
-    "enabled": false,
-    "title": "Thông báo",
-    "text": ""
-  }
+  ]
 }

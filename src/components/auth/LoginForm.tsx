@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 import { site } from "@/data/site";
 import { validateUsername } from "@/lib/auth-validate";
+import { takeReturnTo } from "@/lib/after-auth";
 import PasswordField from "./PasswordField";
 import Turnstile from "./Turnstile";
 import { btnCls, fieldCls, linkCls } from "./ui";
@@ -61,7 +62,7 @@ export default function LoginForm() {
       if (res.ok && body.session) {
         const { error: err } = await sb.auth.setSession(body.session);
         if (err) { setError("Có lỗi xảy ra. Thử lại sau ít phút."); return; }
-        router.replace("/");
+        router.replace(takeReturnTo()); // về lại game đang định tải (nếu có), không thì trang chủ
         return;
       }
       setError(loginMessage(body));

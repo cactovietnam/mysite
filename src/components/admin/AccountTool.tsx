@@ -8,7 +8,7 @@ import PasswordField from "@/components/auth/PasswordField";
 import { btnCls, fieldCls, linkCls } from "@/components/auth/ui";
 
 type Row = { id: string; username: string; failed: number; locked: boolean; isAdmin: boolean };
-type Reply = { accounts?: Row[]; code?: string; message?: string };
+type Reply = { accounts?: Row[]; usernames?: string[]; total?: number; code?: string; message?: string };
 
 // Bỏ ký tự dễ nhầm (0/O, 1/l/I) vì mật khẩu sẽ được đọc/nhắn lại cho người dùng.
 const ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -59,6 +59,7 @@ export default function AccountTool() {
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [issued, setIssued] = useState<{ username: string; password: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async (t: string) => {
     setState("loading");
@@ -81,6 +82,23 @@ export default function AccountTool() {
     const t = q.trim();
     if (!/^\w{0,12}$/.test(t)) { setNote({ ok: false, text: "Tên tài khoản chỉ gồm chữ không dấu, số, gạch dưới (tối đa 12 ký tự)." }); return; }
     setNote(null); setTerm(t); void load(t);
+  };
+
+  // Xuất toàn bộ tên tài khoản ra .txt: dòng đầu là tổng số tài khoản, các dòng sau mỗi dòng một tên.
+  const exportAll = async () => {
+    if (exporting) return;
+    setExporting(true); setNote(null);
+    const { status, body } = await call("/api/admin/accounts?export=1");
+    setExporting(false);
+    if (status !== 200 || !body.usernames) { setNote({ ok: false, text: errText(status, body) }); return; }
+    const names = body.usernames;
+    const text = `\uFEFFTổng số tài khoản: ${names.length}\r\n${names.join("\r\n")}\r\n`; // BOM + CRLF: Notepad trên Windows đọc đúng tiếng Việt
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+    const el = document.createElement("a");
+    el.href = url; el.download = `tai-khoan-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(el); el.click(); el.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setNote({ ok: true, text: `Đã xuất ${names.length} tài khoản ra file .txt.` });
   };
 
   const act = async (row: Row, action: "unlock" | "reset-password") => {
@@ -111,6 +129,13 @@ export default function AccountTool() {
         <input id="acct-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nhập tên tài khoản cần tìm" maxLength={12} autoComplete="off" className={fieldCls} />
         <button type="submit" disabled={state === "loading"} className={`${btnCls} !w-auto shrink-0`}>Tìm</button>
       </form>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" onClick={() => void exportAll()} disabled={exporting || state === "loading"} className={smallBtn}>
+          {exporting ? "Đang xuất…" : "Xuất danh sách tên (.txt)"}
+        </button>
+        <span className="text-xs text-haze">Dòng đầu là tổng số tài khoản, các dòng sau là tên từng người.</span>
+      </div>
 
       {note && <p role={note.ok ? "status" : "alert"} className={`rounded-2xl px-4 py-3 text-sm ${note.ok ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-300"}`}>{note.text}</p>}
 

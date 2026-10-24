@@ -12,6 +12,25 @@ export async function GET(req: Request) {
   const g = await requireAdmin(req);
   if (g instanceof Response) return g;
   const { db } = g;
+
+  // ?export=1 : toàn bộ tên tài khoản (chỉ tên, không có mật khẩu/id) để client ghép thành file .txt. Đọc từng lô 1000 vì Supabase giới hạn số dòng mỗi lần.
+  if (new URL(req.url).searchParams.get("export") === "1") {
+    try {
+      const usernames: string[] = [];
+      for (let from = 0; from < 200_000; from += 1000) {
+        const { data, error } = await db.from("profiles").select("username").order("username").range(from, from + 999);
+        if (error) throw error;
+        const rows = (data ?? []) as { username: string }[];
+        for (const row of rows) usernames.push(row.username);
+        if (rows.length < 1000) break;
+      }
+      return json({ total: usernames.length, usernames });
+    } catch (e) {
+      await reportError(e, { source: "server", path: "/api/admin/accounts?export", method: "GET" });
+      return json({ code: "error" }, 500);
+    }
+  }
+
   const q = new URL(req.url).searchParams.get("q") ?? "";
   if (!QUERY.test(q)) return json({ code: "invalid" }, 400);
 
