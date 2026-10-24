@@ -1,14 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const SHOW_AFTER = 700; // px đã cuộn thì mới hiện nút
 
 // Nút nổi "lên đầu trang". Ẩn khi chưa cuộn; lúc ẩn không nhận chuột/phím (tabIndex -1, aria-hidden).
 export default function BackToTop() {
   const [show, setShow] = useState(false);
+  const shown = useRef(false); // chỉ gọi setState khi vượt ngưỡng, không gọi ở mỗi sự kiện cuộn
 
   useEffect(() => {
-    const onScroll = () => setShow(window.scrollY > SHOW_AFTER);
+    const onScroll = () => { const v = window.scrollY > SHOW_AFTER; if (v !== shown.current) { shown.current = v; setShow(v); } };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);

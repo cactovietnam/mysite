@@ -66,6 +66,7 @@ export default function HeroSlider({ games }: { games: SlideData[] }) {
         }}
       >
         <div aria-live={playing ? "off" : "polite"} className="absolute inset-0">
+          {/* slide không hiện thì invisible (sau khi mờ xong): trình duyệt bỏ hẳn việc vẽ/ghép các lớp ảnh to nằm chồng phía sau */}
           {games.map((s, i) => {
             const on = i === cur;
             const { adult, patch } = gameBadges(s.tags);
@@ -76,14 +77,14 @@ export default function HeroSlider({ games }: { games: SlideData[] }) {
                 aria-label={`${i + 1} / ${n}`}
                 aria-hidden={!on}
                 inert={!on}
-                className={`absolute inset-0 transition-opacity duration-700 ease-out ${on ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                className={`absolute inset-0 transition-[opacity,visibility] duration-700 ease-out ${on ? "visible opacity-100" : "pointer-events-none invisible opacity-0"}`}
               >
                 {/* nền: ảnh mờ 32px hiện ngay, ảnh thật phủ lên khi tải xong */}
                 <div aria-hidden className="absolute inset-0 bg-cover bg-center"
                      style={s.blur ? { backgroundImage: `url("${s.blur}")` } : undefined}>
                   {near(i) && (
                     <Cover decorative priority={i === 0} src={s.cover} title={s.title} engine={s.engine}
-                           className={`h-full w-full object-cover object-[50%_25%] transition-transform duration-[6500ms] ease-out ${on ? "scale-105" : "scale-100"}`} />
+                           className={`h-full w-full object-cover object-[50%_25%] transform-gpu transition-transform duration-[6500ms] ease-out ${on ? "scale-105 will-change-transform" : "scale-100"}`} />
                   )}
                 </div>
                 <div aria-hidden className="absolute inset-0"

@@ -19,7 +19,7 @@ export default function PopupNotice() {
   if (!open) return null;
 
   return (
-    <div className="anim-fade fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-ink/80 p-4 md:backdrop-blur-sm" onClick={() => setClosed(true)}>
+    <div className="anim-fade fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-ink/85 p-4" onClick={() => setClosed(true)}>
       <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="popup-title"
            className="glass anim-pop w-full max-w-md rounded-[2rem] p-6 text-center shadow-2xl shadow-black/50 outline-none sm:p-8"
            onClick={(e) => e.stopPropagation()}>

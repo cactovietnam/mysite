@@ -95,7 +95,7 @@ export default function DownloadPanel({ slug, title, hasLinks }: { slug: string;
       </button>
 
       {open && createPortal(
-        <div className="anim-fade fixed inset-0 z-50 grid place-items-center bg-ink/75 p-4 md:backdrop-blur-sm" onClick={() => setOpen(false)}>
+        <div className="anim-fade fixed inset-0 z-50 grid place-items-center bg-ink/85 p-4" onClick={() => setOpen(false)}>
           {needLogin ? (
             <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Cần tài khoản để tải game"
                  className="glass anim-pop w-full max-w-md rounded-[2rem] p-6 text-center shadow-2xl shadow-black/50"

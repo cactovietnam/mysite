@@ -79,7 +79,7 @@ export default function SearchBox() {
       </button>
 
       {open && createPortal(
-        <div className="anim-fade fixed inset-0 z-50 flex items-start justify-center bg-ink/70 px-4 pt-[12vh] md:backdrop-blur-sm" onClick={close}>
+        <div className="anim-fade fixed inset-0 z-50 flex items-start justify-center bg-ink/85 px-4 pt-[12vh]" onClick={close}>
           <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Tìm game"
                className="glass anim-pop w-full max-w-xl rounded-[1.75rem] p-3 shadow-2xl shadow-black/50 outline-none"
                onClick={(e) => e.stopPropagation()}>

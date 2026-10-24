@@ -128,8 +128,8 @@ export default function Library({ games }: { games: GameCardData[] }) {
           <>
             <div key={`${filters.engine ?? "all"}-${page}`} className="grid grid-cols-1 gap-x-3 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
               {shown.map((g, i) => (
-                // stagger: thẻ vào lần lượt, trần 8 nhịp để danh sách dài không phải chờ
-                <div key={g.slug} className="anim-pop" style={{ "--d": `${Math.min(i, 8) * 55}ms` } as React.CSSProperties}>
+                // stagger: thẻ vào lần lượt, trần 6 nhịp, mỗi nhịp 35ms để danh sách dài không phải chờ
+                <div key={g.slug} className="anim-pop" style={{ "--d": `${Math.min(i, 6) * 35}ms` } as React.CSSProperties}>
                   <GameCard game={g} />
                 </div>
               ))}

@@ -43,7 +43,7 @@ export default function AgeGate() {
 
   return (
     // Lớp ngoài cuộn được: màn hình thấp (điện thoại ngang) vẫn thấy hết nút bấm
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-ink/95 md:backdrop-blur-md">
+    <div className="fixed inset-0 z-[60] overflow-y-auto bg-ink/95">
       <div className="grid min-h-full place-items-center p-4">
         <div ref={ref} data-focus-root tabIndex={-1} role="dialog" aria-modal="true"
              aria-labelledby="age-title" aria-describedby="age-desc"
