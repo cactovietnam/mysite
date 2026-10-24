@@ -7,6 +7,8 @@ import { applyFilters, buildTagIndex, parseFilters, serializeFilters, type Filte
 import FilterPanel from "./FilterPanel";
 import GameCard from "./GameCard";
 import { EmptyArt, GhostCard } from "./LibraryArt";
+import Pagination from "./Pagination";
+import { engineColor, isHex, onColor } from "@/lib/game-ui";
 
 // Bộ lọc đồng bộ với URL (?engine=Unity&tag=Romance&mode=and&q=...&sort=name): chia sẻ được link, nút Back hoạt động.
 // Đọc URL bằng useSyncExternalStore: HTML tĩnh vẫn chứa đủ game, client lọc sau khi hydrate.
@@ -19,7 +21,7 @@ const subscribe = (cb: () => void) => {
 const getSearch = () => window.location.search;
 
 // Tag gợi ý sửa trong src/data/site.json -> tagPresets (thiếu mục này thì chỉ hiện tag có trong games.json)
-const PAGE = 30; // số game hiện mỗi lượt; bấm "Xem thêm" để hiện tiếp
+const PAGE_SIZE = 15; // số game mỗi trang
 const PRESETS = (site as { tagPresets?: string[] }).tagPresets ?? [];
 
 export default function Library({ games }: { games: GameCardData[] }) {
@@ -39,10 +41,10 @@ export default function Library({ games }: { games: GameCardData[] }) {
     return filters.list === "seen" ? hit.sort((a, b) => rank.get(a.slug)! - rank.get(b.slug)!) : hit;
   }, [games, filters, fav, seen]);
   const [panelOpen, setPanelOpen] = useState(false); // chỉ dùng trên điện thoại/tablet
-  // Số game đang hiện gắn với query hiện tại: đổi bộ lọc/sắp xếp thì tự về PAGE mà không cần effect.
-  const [more, setMore] = useState({ key: "", n: PAGE });
-  const limit = more.key === search ? more.n : PAGE;
-  const shown = list.slice(0, limit);
+  // Trang nằm trong URL (?page=2). Kẹp lại nếu link cũ trỏ quá số trang hiện có (vd lọc xong còn ít game).
+  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const page = Math.min(filters.page, pages);
+  const shown = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const dirty = filters.list !== "all" || filters.engine !== null || filters.q.trim() !== "" || filters.tags.length > 0;
   const badge = filters.tags.length + (filters.q.trim() ? 1 : 0);
@@ -50,19 +52,41 @@ export default function Library({ games }: { games: GameCardData[] }) {
   // replace=true cho ô gõ chữ: không đẩy mỗi phím vào lịch sử Back
   const update = (patch: Partial<Filters>, replace = false) => {
     const { pathname, hash } = window.location;
-    const url = pathname + serializeFilters({ ...filters, ...patch }) + hash;
+    const url = pathname + serializeFilters({ ...filters, page: 1, ...patch }) + hash; // đổi bộ lọc nào cũng về trang 1, trừ khi patch chỉ định page
     window.history[replace ? "replaceState" : "pushState"](null, "", url);
     window.dispatchEvent(new Event(EVENT));
   };
+  const goPage = (p: number) => {
+    update({ page: p });
+    document.getElementById("kho-game")?.scrollIntoView({ block: "start" }); // về đầu kho game để thấy hàng đầu của trang mới
+  };
   const clear = () => update({ engine: null, q: "", tags: [], list: "all" });
+
+  // Mỗi chip một màu riêng: engine lấy màu engine (site.json), Yêu thích = hồng san hô, Đã xem = xanh trời, Tất cả = tím -> hồng đậm.
+  // Chưa chọn: nền + viền nhạt pha màu, chữ sáng, số theo màu. Đã chọn: đặc màu + glow, chữ tự chọn sáng/tối theo độ tương phản.
+  const tone = (c: string, on: boolean): React.CSSProperties => {
+    if (!on) return { background: `${c}1a`, borderColor: `${c}4d`, color: "#efeaff" };
+    const fg = onColor(c);
+    return { background: c, borderColor: c, color: fg, boxShadow: `0 8px 24px -8px ${c}, 0 0 0 1px ${c}` };
+  };
+  const base = "rounded-full border px-4 py-2 text-sm font-semibold transition duration-300 hover:-translate-y-0.5 active:scale-95";
 
   const chip = (id: string, label: string, count: number) => {
     const on = (filters.engine ?? "all") === id;
+    if (id === "all") {
+      return (
+        <button key={id} onClick={() => update({ engine: null })} aria-pressed={on}
+                className={`${base} ${on ? "border-transparent bg-gradient-to-r from-[#7c3aed] to-[#db2777] text-white shadow-[0_8px_24px_-8px_#db2777]" : "border-[#a78bfa]/30 bg-[#a78bfa]/10 text-mist hover:bg-[#a78bfa]/20"}`}>
+          {label} <span className={on ? "text-white/70" : "text-[#c4b5fd]"}>{count}</span>
+        </button>
+      );
+    }
+    const raw = engineColor(id);
+    const c = isHex(raw) ? raw : "#a78bfa";
     return (
-      <button key={id} onClick={() => update({ engine: id === "all" ? null : id })} aria-pressed={on}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition duration-300 ${
-                on ? "bg-gradient-to-r from-[#2af5d6] to-[#ff2e93] text-ink" : "glass text-mist/80 hover:bg-white/10 hover:text-mist"}`}>
-        {label} <span className={on ? "text-ink/55" : "text-haze"}>{count}</span>
+      <button key={id} onClick={() => update({ engine: id })} aria-pressed={on} style={tone(c, on)}
+              className={`${base} ${on ? "" : "hover:brightness-125"}`}>
+        {label} <span style={{ color: on ? undefined : c, opacity: on ? 0.65 : 1 }}>{count}</span>
       </button>
     );
   };
@@ -87,13 +111,12 @@ export default function Library({ games }: { games: GameCardData[] }) {
           <div className="flex flex-wrap gap-2.5">
             {chip("all", "Tất cả", games.length)}
             {engines.map((e) => chip(e, e, games.filter((g) => g.engine === e).length))}
-            {([["fav", "Yêu thích", alive(fav)], ["seen", "Đã xem", alive(seen)]] as const).map(([k, label, n]) => {
+            {([["fav", "Yêu thích", alive(fav), "#fb7185"], ["seen", "Đã xem", alive(seen), "#38bdf8"]] as const).map(([k, label, n, c]) => {
               const on = filters.list === k;
               return (
-                <button key={k} onClick={() => update({ list: on ? "all" : k })} aria-pressed={on}
-                        className={`rounded-full px-4 py-2 text-sm font-medium transition duration-300 ${
-                          on ? "bg-berry text-ink" : "glass text-mist/80 hover:bg-white/10 hover:text-mist"}`}>
-                  {label} <span className={on ? "text-ink/60" : "text-haze"}>{n}</span>
+                <button key={k} onClick={() => update({ list: on ? "all" : k })} aria-pressed={on} style={tone(c, on)}
+                        className={`${base} ${on ? "" : "hover:brightness-125"}`}>
+                  {label} <span style={{ color: on ? undefined : c, opacity: on ? 0.65 : 1 }}>{n}</span>
                 </button>
               );
             })}
@@ -103,7 +126,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
 
         {list.length > 0 ? (
           <>
-            <div key={filters.engine ?? "all"} className="grid grid-cols-1 gap-x-3 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
+            <div key={`${filters.engine ?? "all"}-${page}`} className="grid grid-cols-1 gap-x-3 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
               {shown.map((g, i) => (
                 // stagger: thẻ vào lần lượt, trần 8 nhịp để danh sách dài không phải chờ
                 <div key={g.slug} className="anim-pop" style={{ "--d": `${Math.min(i, 8) * 55}ms` } as React.CSSProperties}>
@@ -112,15 +135,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
               ))}
               {!dirty && Array.from({ length: Math.max(0, 3 - list.length) }, (_, i) => <GhostCard key={`ghost-${i}`} />)}
             </div>
-            {list.length > shown.length && (
-              <div className="mt-8 flex flex-col items-center gap-2">
-                <button type="button" onClick={() => setMore({ key: search, n: limit + PAGE })}
-                        className="glass rounded-full px-7 py-3 text-sm font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15 active:scale-95">
-                  Xem thêm ({list.length - shown.length} game)
-                </button>
-                <p className="text-xs text-haze">Đang hiện {shown.length}/{list.length}</p>
-              </div>
-            )}
+            <Pagination page={page} pages={pages} total={list.length} size={PAGE_SIZE} onPage={goPage} />
           </>
         ) : (
           <div className="glass grid place-items-center rounded-[1.75rem] px-6 py-14 text-center">

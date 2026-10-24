@@ -10,6 +10,7 @@ export type Filters = {
   tags: string[]; // nhãn chuẩn (TagInfo.label)
   mode: TagMode; // or: có ít nhất 1 tag | and: có đủ mọi tag
   sort: SortKey;
+  page: number; // trang hiện tại (từ 1); đổi bộ lọc thì Library tự về trang 1
   list: ListKey; // all | fav (yêu thích) | seen (đã xem); lọc theo slug ở Library vì dữ liệu nằm ở trình duyệt
 };
 
@@ -67,6 +68,7 @@ export function parseFilters(search: string, engines: string[], index: TagInfo[]
     tags,
     mode: sp.get("mode") === "and" ? "and" : "or",
     sort: SORTS.some((s) => s.key === sort) ? (sort as SortKey) : "new",
+    page: Math.max(1, parseInt(sp.get("page") ?? "", 10) || 1),
     list: sp.get("list") === "fav" ? "fav" : sp.get("list") === "seen" ? "seen" : "all",
   };
 }
@@ -80,6 +82,7 @@ export function serializeFilters(f: Filters): string {
   if (f.mode === "and") sp.set("mode", "and");
   if (f.sort !== "new") sp.set("sort", f.sort);
   if (f.list !== "all") sp.set("list", f.list);
+  if (f.page > 1) sp.set("page", String(f.page));
   const s = sp.toString();
   return s ? `?${s}` : "";
 }
