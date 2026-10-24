@@ -3,6 +3,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { site } from "@/data/site";
 import { useModal } from "@/lib/use-modal";
+import { usePresence } from "@/lib/use-presence";
 import { LOGO } from "@/lib/logos";
 
 const ok = (u: string) => /^https?:\/\//i.test(u);
@@ -19,6 +20,7 @@ type Opt = { id: keyof typeof LOGO; name: string; url: string; note: string };
 // variant "pill": nút ở trang game, vẫn mở popup để nhắc kèm tên game + link lỗi.
 export default function ReportMenu({ variant, game }: { variant: "tile" | "pill"; game?: string }) {
   const [open, setOpen] = useState(false);
+  const { mounted, closing } = usePresence(open);
   const modalRef = useModal(open, () => setOpen(false)); // khóa cuộn, nhốt Tab, Esc đóng, trả focus
 
   const opts = [
@@ -48,10 +50,10 @@ export default function ReportMenu({ variant, game }: { variant: "tile" | "pill"
         </button>
       )}
 
-      {variant === "pill" && open && createPortal(
-        <div className="anim-fade fixed inset-0 z-50 grid place-items-center bg-ink/85 p-4" onClick={() => setOpen(false)}>
+      {variant === "pill" && mounted && createPortal(
+        <div className={`${closing ? "anim-out-fade" : "anim-fade"} fixed inset-0 z-50 grid place-items-center bg-ink/85 p-4`} onClick={() => setOpen(false)}>
           <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Báo lỗi"
-               className="glass anim-pop w-full max-w-md rounded-[2rem] p-5 shadow-2xl shadow-black/50"
+               className={`glass ${closing ? "anim-out-pop" : "anim-pop"} w-full max-w-md rounded-[2rem] p-5 shadow-2xl shadow-black/50`}
                onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 px-1">
               <div>

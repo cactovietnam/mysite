@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fold } from "@/lib/library-filter";
 import { useModal } from "@/lib/use-modal";
+import { usePresence } from "@/lib/use-presence";
 import Cover from "./Cover";
 
 // Khớp với src/app/search-index.json/route.ts
@@ -48,16 +49,18 @@ export default function SearchBox() {
   }, [open, index]);
   const warm = () => { loadIndex().catch(() => {}); };
 
-  const close = useCallback(() => { setOpen(false); setQ(""); setIdx(0); }, []);
+  const close = useCallback(() => setOpen(false), []); // không xóa ô tìm lúc đóng: danh sách không bị nhảy trong lúc mờ dần
+  const show = useCallback(() => { setQ(""); setIdx(0); setOpen(true); }, []);
+  const { mounted, closing } = usePresence(open);
   const dialogRef = useModal(open, close); // khóa cuộn, nhốt Tab, Esc đóng, trả focus
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setOpen(true); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); show(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [show]);
 
   const onInputKey = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") { e.preventDefault(); setIdx((i) => Math.min(i + 1, results.length - 1)); }
@@ -67,7 +70,7 @@ export default function SearchBox() {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} onPointerEnter={warm} onFocus={warm} aria-label="Tìm kiếm"
+      <button onClick={show} onPointerEnter={warm} onFocus={warm} aria-label="Tìm kiếm"
               className="flex h-10 items-center justify-center rounded-lg border border-[rgba(148,163,184,0.22)] bg-[rgba(30,27,46,0.85)] px-3 text-sm text-slate-400 transition hover:border-[#2af5d6]/40 hover:text-white sm:w-44 sm:justify-between xl:w-60 sm:px-4">
         <span className="hidden sm:inline">Tìm kiếm game...</span>
         <span className="flex items-center gap-2">
@@ -78,10 +81,10 @@ export default function SearchBox() {
         </span>
       </button>
 
-      {open && createPortal(
-        <div className="anim-fade fixed inset-0 z-50 flex items-start justify-center bg-ink/85 px-4 pt-[12vh]" onClick={close}>
+      {mounted && createPortal(
+        <div className={`${closing ? "anim-out-fade" : "anim-fade"} fixed inset-0 z-50 flex items-start justify-center bg-ink/85 px-4 pt-[12vh]`} onClick={close}>
           <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Tìm game"
-               className="glass anim-pop w-full max-w-xl rounded-[1.75rem] p-3 shadow-2xl shadow-black/50 outline-none"
+               className={`glass ${closing ? "anim-out-pop" : "anim-pop"} w-full max-w-xl rounded-[1.75rem] p-3 shadow-2xl shadow-black/50 outline-none`}
                onClick={(e) => e.stopPropagation()}>
             <input data-autofocus value={q} onChange={(e) => { setQ(e.target.value); setIdx(0); }} onKeyDown={onInputKey}
                    placeholder="Tìm theo tên, tag hoặc engine"

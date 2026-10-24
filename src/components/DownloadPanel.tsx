@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useModal } from "@/lib/use-modal";
+import { usePresence } from "@/lib/use-presence";
 import { authConfigured, getSupabase } from "@/lib/supabase";
 import { useAuthUser } from "@/lib/auth-store";
 import { setReturnTo } from "@/lib/after-auth";
@@ -19,6 +20,7 @@ export default function DownloadPanel({ slug, title, hasLinks }: { slug: string;
   const [links, setLinks] = useState<Links | null>(null);
   const [err, setErr] = useState<"auth" | "error" | null>(null);
 
+  const { mounted, closing } = usePresence(open); // giữ hộp thêm ~160ms để chạy hiệu ứng đóng
   const modalRef = useModal(open, () => setOpen(false)); // khóa cuộn, nhốt Tab, Esc đóng, trả focus
 
   // Popup mở: header nổi lên trên lớp phủ (CSS ở globals.css, theo thuộc tính data-dl-open).
@@ -94,11 +96,11 @@ export default function DownloadPanel({ slug, title, hasLinks }: { slug: string;
         </span>
       </button>
 
-      {open && createPortal(
-        <div className="anim-fade fixed inset-0 z-50 grid place-items-center bg-ink/85 p-4" onClick={() => setOpen(false)}>
+      {mounted && createPortal(
+        <div className={`${closing ? "anim-out-fade" : "anim-fade"} fixed inset-0 z-50 grid place-items-center bg-ink/85 p-4`} onClick={() => setOpen(false)}>
           {needLogin ? (
             <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Cần tài khoản để tải game"
-                 className="glass anim-pop w-full max-w-md rounded-[2rem] p-6 text-center shadow-2xl shadow-black/50"
+                 className={`glass ${closing ? "anim-out-pop" : "anim-pop"} w-full max-w-md rounded-[2rem] p-6 text-center shadow-2xl shadow-black/50`}
                  onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-end">{close}</div>
               <span className="mx-auto -mt-2 grid size-16 place-items-center rounded-full bg-accent/15 text-accent">
@@ -118,7 +120,7 @@ export default function DownloadPanel({ slug, title, hasLinks }: { slug: string;
             </div>
           ) : (
             <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Link tải ${title}`}
-                 className="glass anim-pop w-full max-w-md rounded-[2rem] p-5 shadow-2xl shadow-black/50"
+                 className={`glass ${closing ? "anim-out-pop" : "anim-pop"} w-full max-w-md rounded-[2rem] p-5 shadow-2xl shadow-black/50`}
                  onClick={(e) => e.stopPropagation()}>
               <div className="flex items-start justify-between gap-4 px-1">
                 <div>

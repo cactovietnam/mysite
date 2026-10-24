@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { GameCardData } from "@/data/games";
 import { site } from "@/data/site";
 import { useList } from "@/lib/user-lists";
@@ -56,9 +56,18 @@ export default function Library({ games }: { games: GameCardData[] }) {
     window.history[replace ? "replaceState" : "pushState"](null, "", url);
     window.dispatchEvent(new Event(EVENT));
   };
+  // Đổi danh sách có hiệu ứng: lưới mờ đi + trượt xuống nhẹ (150ms), đổi nội dung rồi các thẻ hiện lần lượt. Bấm dồn trong lúc đang chạy thì bỏ qua.
+  const [leaving, setLeaving] = useState(false);
+  const busy = useRef(false);
+  const swap = (fn: () => void) => {
+    if (busy.current) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { fn(); return; }
+    busy.current = true; setLeaving(true);
+    setTimeout(() => { fn(); setLeaving(false); busy.current = false; }, 150);
+  };
   const goPage = (p: number) => {
-    update({ page: p });
-    document.getElementById("kho-game")?.scrollIntoView({ block: "start" }); // về đầu kho game để thấy hàng đầu của trang mới
+    document.getElementById("kho-game")?.scrollIntoView({ block: "start", behavior: "smooth" }); // cuộn mượt về đầu kho game trong lúc lưới đang mờ
+    swap(() => update({ page: p }));
   };
   const clear = () => update({ engine: null, q: "", tags: [], list: "all" });
 
@@ -75,7 +84,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
     const on = (filters.engine ?? "all") === id;
     if (id === "all") {
       return (
-        <button key={id} onClick={() => update({ engine: null })} aria-pressed={on}
+        <button key={id} onClick={() => swap(() => update({ engine: null }))} aria-pressed={on}
                 className={`${base} ${on ? "border-transparent bg-gradient-to-r from-[#7c3aed] to-[#db2777] text-white shadow-[0_8px_24px_-8px_#db2777]" : "border-[#a78bfa]/30 bg-[#a78bfa]/10 text-mist hover:bg-[#a78bfa]/20"}`}>
           {label} <span className={on ? "text-white/70" : "text-[#c4b5fd]"}>{count}</span>
         </button>
@@ -84,7 +93,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
     const raw = engineColor(id);
     const c = isHex(raw) ? raw : "#a78bfa";
     return (
-      <button key={id} onClick={() => update({ engine: id })} aria-pressed={on} style={tone(c, on)}
+      <button key={id} onClick={() => swap(() => update({ engine: id }))} aria-pressed={on} style={tone(c, on)}
               className={`${base} ${on ? "" : "hover:brightness-125"}`}>
         {label} <span style={{ color: on ? undefined : c, opacity: on ? 0.65 : 1 }}>{count}</span>
       </button>
@@ -114,7 +123,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
             {([["fav", "Yêu thích", alive(fav), "#fb7185"], ["seen", "Đã xem", alive(seen), "#38bdf8"]] as const).map(([k, label, n, c]) => {
               const on = filters.list === k;
               return (
-                <button key={k} onClick={() => update({ list: on ? "all" : k })} aria-pressed={on} style={tone(c, on)}
+                <button key={k} onClick={() => swap(() => update({ list: on ? "all" : k }))} aria-pressed={on} style={tone(c, on)}
                         className={`${base} ${on ? "" : "hover:brightness-125"}`}>
                   {label} <span style={{ color: on ? undefined : c, opacity: on ? 0.65 : 1 }}>{n}</span>
                 </button>
@@ -125,8 +134,9 @@ export default function Library({ games }: { games: GameCardData[] }) {
         </div>
 
         {list.length > 0 ? (
-          <>
-            <div key={`${filters.engine ?? "all"}-${page}`} className="grid grid-cols-1 gap-x-3 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className={`transition-[opacity,transform] duration-150 ease-out ${leaving ? "translate-y-2 opacity-0" : ""}`}>
+            {/* key gồm mọi bộ lọc trừ ô gõ tên: đổi lọc/trang thì các thẻ hiện lại lần lượt, còn gõ chữ thì không nhấp nháy */}
+            <div key={`${filters.engine ?? "all"}|${filters.list}|${filters.sort}|${filters.mode}|${filters.tags.join(",")}|${page}`} className="grid grid-cols-1 gap-x-3 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
               {shown.map((g, i) => (
                 // stagger: thẻ vào lần lượt, trần 6 nhịp, mỗi nhịp 35ms để danh sách dài không phải chờ
                 <div key={g.slug} className="anim-pop" style={{ "--d": `${Math.min(i, 6) * 35}ms` } as React.CSSProperties}>
@@ -136,7 +146,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
               {!dirty && Array.from({ length: Math.max(0, 3 - list.length) }, (_, i) => <GhostCard key={`ghost-${i}`} />)}
             </div>
             <Pagination page={page} pages={pages} total={list.length} size={PAGE_SIZE} onPage={goPage} />
-          </>
+          </div>
         ) : (
           <div className="glass grid place-items-center rounded-[1.75rem] px-6 py-14 text-center">
             <EmptyArt />

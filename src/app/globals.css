@@ -101,3 +101,17 @@ html[data-dl-open] #site-header > * { pointer-events: auto; }
   content: ""; flex: none; width: 4px; height: 1.1em; border-radius: 9999px;
   background: linear-gradient(180deg, #2af5d6, #ff2e93); box-shadow: 0 0 12px rgba(42, 245, 214, 0.5);
 }
+
+/* ---------- Hiệu ứng chuyển (chỉ opacity + transform: chạy trên GPU, không bắt trình duyệt tính lại bố cục) ---------- */
+/* Hộp thoại đóng: mờ dần + lún xuống thay vì biến mất cái rụp */
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes pop-out  { to { opacity: 0; transform: translateY(8px) scale(0.97); } }
+.anim-out-fade { animation: fade-out 0.16s ease both; pointer-events: none; }
+.anim-out-pop  { animation: pop-out 0.16s cubic-bezier(0.4, 0, 1, 1) both; }
+
+/* Rời trang: nội dung (không gồm header/footer) mờ đi và trượt nhẹ lên (PageTransition.tsx gắn data-leaving) */
+#page { transition: opacity 0.15s ease, transform 0.15s ease; }
+#page[data-leaving] { opacity: 0; transform: translate3d(0, -8px, 0); pointer-events: none; }
+/* Vào trang mới: hiện dần + trượt nhẹ từ dưới lên. Chỉ chạy sau khi người dùng đã chuyển trang (html[data-nav]), lần tải đầu không bị trễ. */
+@keyframes page-in { from { opacity: 0; transform: translate3d(0, 12px, 0); } to { opacity: 1; transform: none; } }
+html[data-nav] .anim-page { animation: page-in 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }

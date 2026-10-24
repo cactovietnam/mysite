@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useModal } from "@/lib/use-modal";
+import { usePresence } from "@/lib/use-presence";
 
 const btn = "glass rounded-full px-5 py-2.5 text-sm font-medium transition hover:bg-white/20 active:scale-95";
 
@@ -11,6 +12,10 @@ export default function Gallery({ images, title }: { images: string[]; title: st
   const touchX = useRef<number | null>(null);
   const n = images.length;
   const open = cur !== null;
+  const { mounted, closing } = usePresence(open);
+  const [last, setLast] = useState(0); // ảnh đang xem, giữ lại để lúc mờ dần vẫn còn ảnh
+  if (cur !== null && cur !== last) setLast(cur);
+  const idx = cur ?? last;
 
   const go = (d: number) => { setZoom(false); setCur((c) => (c === null ? c : (c + d + n) % n)); };
   const close = () => { setZoom(false); setCur(null); };
@@ -43,9 +48,9 @@ export default function Gallery({ images, title }: { images: string[]; title: st
         ))}
       </div>
 
-      {cur !== null && (
+      {mounted && (
         <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Xem ảnh"
-             className="anim-fade fixed inset-0 z-50 flex flex-col bg-ink/95"
+             className={`${closing ? "anim-out-fade" : "anim-fade"} fixed inset-0 z-50 flex flex-col bg-ink/95`}
              onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
              onTouchEnd={(e) => {
                if (touchX.current === null || zoom) return;
@@ -54,7 +59,7 @@ export default function Gallery({ images, title }: { images: string[]; title: st
                if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
              }}>
           <div className="flex items-center justify-between p-3 sm:p-4">
-            <span className="glass rounded-full px-4 py-2 text-sm font-medium">{cur + 1}/{n}</span>
+            <span className="glass rounded-full px-4 py-2 text-sm font-medium">{idx + 1}/{n}</span>
             <div className="flex gap-2">
               <button onClick={() => setZoom((z) => !z)} className={btn}>{zoom ? "Thu nhỏ" : "Phóng thêm"}</button>
               <button onClick={close} className={btn}>Đóng &times;</button>
@@ -64,7 +69,7 @@ export default function Gallery({ images, title }: { images: string[]; title: st
           <div className={`min-h-0 flex-1 px-3 ${zoom ? "overflow-auto" : "grid place-items-center overflow-hidden"}`}
                onClick={() => { if (!zoom) close(); }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img key={cur} src={images[cur]} alt={`${title} - ảnh ${cur + 1}`}
+            <img key={idx} src={images[idx]} alt={`${title} - ảnh ${idx + 1}`}
                  className={zoom
                    ? "w-[180%] max-w-none rounded-2xl sm:w-[140%]"
                    : "anim-pop max-h-[calc(100dvh-9rem)] max-w-full rounded-2xl object-contain"}

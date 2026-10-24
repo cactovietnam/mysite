@@ -16,6 +16,7 @@ import FavSync from "@/components/FavSync";
 import NotificationBell from "@/components/NotificationBell";
 import OnlineCount from "@/components/OnlineCount";
 import PopupNotice from "@/components/PopupNotice";
+import PageTransition from "@/components/PageTransition";
 import { LOGO } from "@/lib/logos";
 import { games } from "@/data/games";
 import { site, siteUrl } from "@/data/site";
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ClientErrorReporter />
         <ReloadReset />
         <FavSync />
+        <PageTransition />
         {site.ageGate.enabled && <AgeGate />}
         <PopupNotice />
         <HeaderShell
@@ -81,7 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
         />
 
-        <div className="flex-1">{children}</div>
+        <div id="page" className="flex-1">{children}</div>
 
         <Footer />
         <BackToTop />
