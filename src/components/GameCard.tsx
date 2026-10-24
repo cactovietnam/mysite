@@ -22,7 +22,7 @@ export default function GameCard({ game }: { game: GameCardData }) {
     <Link href={`/game/${game.slug}`}
           className="group block rounded-[1.9rem] p-2 transition duration-300 ease-out hover:-translate-y-1 hover:bg-white/[0.06] focus-visible:-translate-y-1">
       {/* ảnh mờ làm nền: hiện ngay trong lúc ảnh thật còn đang tải */}
-      <div className="relative aspect-video overflow-hidden rounded-[1.5rem] bg-plum bg-cover ring-1 ring-white/10 transition-shadow duration-500 group-hover:shadow-[0_28px_56px_-20px_var(--c)] group-focus-visible:shadow-[0_28px_56px_-20px_var(--c)]"
+      <div className="relative aspect-video overflow-hidden rounded-[1.5rem] bg-plum bg-cover ring-1 ring-[#8b5cf6]/25 transition group-hover:ring-[#2af5d6]/60 duration-500 group-hover:shadow-[0_28px_56px_-20px_var(--c)] group-focus-visible:shadow-[0_28px_56px_-20px_var(--c)]"
            style={frame}>
         <Cover src={thumbOf(game)} title={game.title} engine={game.engine}
                className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105" />

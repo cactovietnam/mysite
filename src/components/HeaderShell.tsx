@@ -7,7 +7,7 @@ const RANGE = 120;
 // Chiều cao tầng logo to (px). Khớp với h-[104px] và -96px bên dưới.
 const BIG = 104;
 
-type Props = { brand: ReactNode; nav: ReactNode; tools: ReactNode; tagline?: string };
+type Props = { brand: ReactNode; brandBig?: ReactNode; nav: ReactNode; tools: ReactNode };
 
 /**
  * Header giống hệt bản cũ (logo to giữa + menu, cuộn xuống thu thành pill có logo nhỏ bên trái),
@@ -16,7 +16,7 @@ type Props = { brand: ReactNode; nav: ReactNode; tools: ReactNode; tagline?: str
  *  - thu nhỏ bằng transform/opacity, không đổi height
  *  - nền pill là màu ĐẶC (không trong suốt, không blur)
  */
-export default function HeaderShell({ brand, nav, tools, tagline }: Props) {
+export default function HeaderShell({ brand, brandBig, nav, tools }: Props) {
   const ref = useRef<HTMLElement>(null);
   const spacer = useRef<HTMLDivElement>(null);
 
@@ -36,12 +36,13 @@ export default function HeaderShell({ brand, nav, tools, tagline }: Props) {
 
     const update = () => {
       raf = 0;
-      const p = Math.round(Math.min(1, Math.max(0, window.scrollY / RANGE)) * 100) / 100;
+      const raw = Math.min(1, Math.max(0, window.scrollY / RANGE));
+      const p = Math.round(raw * raw * (3 - 2 * raw) * 100) / 100; // easing smoothstep: mượt cả 2 chiều
       if (p === last) return;
       last = p;
       el.style.setProperty("--hp", String(p));
-      big?.toggleAttribute("inert", p >= 0.6);
-      small?.toggleAttribute("inert", wide.matches && p < 0.6);
+      big?.toggleAttribute("inert", raw >= 0.6);
+      small?.toggleAttribute("inert", wide.matches && raw < 0.6);
     };
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
     const onWide = () => { last = -1; update(); };
@@ -68,23 +69,37 @@ export default function HeaderShell({ brand, nav, tools, tagline }: Props) {
         className="pointer-events-none fixed inset-x-0 top-0 z-40 px-4 pt-2"
         style={{ "--hp": 0 } as CSSProperties}
       >
+        {/* Tay cầm viền neon mờ hai bên, mờ dần khi cuộn */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 hidden h-[168px] overflow-hidden md:block"
+             style={{ opacity: "clamp(0, calc(1 - var(--hp) * 2), 1)" }}>
+          <div className="absolute -left-6 top-4 h-36 w-56 -rotate-[18deg] bg-[url(/decor-pad.svg)] bg-contain bg-no-repeat opacity-[0.18]" />
+          <div className="absolute -right-6 top-6 h-36 w-56 rotate-[15deg] bg-[url(/decor-pad.svg)] bg-contain bg-no-repeat opacity-[0.18]" />
+        </div>
+
         {/* Cả khối trượt lên (96px = 104px logo to - 8px đệm thêm khi thu nhỏ, như bản cũ). */}
         <div className="relative mx-auto max-w-6xl px-3 will-change-transform md:[transform:translate3d(0,calc(var(--hp)*-96px),0)]">
-          {/* Nền pill ĐẶC. Lớp ngoài chỉ định vị (absolute), lớp trong mới mang .edge:
+          {/* Nền pill ĐẶC: hiện dần, từ hẹp nở ra + trượt nhẹ vào vị trí.
+              Lớp ngoài chỉ định vị (absolute), lớp trong mới mang .edge:
               .edge đặt position:relative trong globals.css nên KHÔNG được gộp chung với absolute. */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-14"
-            style={{ opacity: "calc(var(--hp) * 4)" }}
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-14 origin-center will-change-transform"
+            style={{
+              opacity: "clamp(0, calc(var(--hp) * 3), 1)",
+              transform: "translate3d(0, calc((1 - var(--hp)) * 10px), 0) scaleX(calc(0.9 + 0.1 * var(--hp)))",
+            }}
           >
             <div className="edge h-full rounded-[28px] bg-[#100c20] shadow-lg shadow-black/40" />
           </div>
 
-          {/* Vạch gradient mảnh dưới menu, chỉ có ở đầu trang */}
+          {/* Vạch gradient dưới menu: ở đầu trang dài hết hàng menu, cuộn xuống thì co về giữa rồi biến mất */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-6 bottom-0 hidden h-px bg-gradient-to-r from-transparent via-berry/50 to-transparent md:block"
-            style={{ opacity: "calc(1 - var(--hp) * 2.5)" }}
+            className="pointer-events-none absolute inset-x-6 bottom-0 hidden h-px origin-center bg-gradient-to-r from-transparent via-berry/50 to-transparent will-change-transform md:block"
+            style={{
+              opacity: "clamp(0, calc(1 - var(--hp) * 2), 1)",
+              transform: "scaleX(calc(1 - var(--hp) * 0.6))",
+            }}
           />
 
           {/* Tầng 1 (từ md): logo to ở giữa, mờ + thu nhỏ khi cuộn */}
@@ -97,8 +112,7 @@ export default function HeaderShell({ brand, nav, tools, tagline }: Props) {
               className="flex shrink-0 items-center gap-5 will-change-transform"
               style={{ transform: "scale(calc(1.5 - 0.5 * var(--hp)))" }}
             >
-              {brand}
-              {tagline && <span className="hidden whitespace-nowrap text-xs text-mist/65 xl:block">{tagline}</span>}
+              {brandBig ?? brand}
             </div>
           </div>
 
@@ -112,7 +126,7 @@ export default function HeaderShell({ brand, nav, tools, tagline }: Props) {
               {brand}
             </div>
             {nav}
-            <div className="ml-auto flex shrink-0 items-center gap-1.5 justify-self-end whitespace-nowrap md:ml-0 [&_*]:whitespace-nowrap">
+            <div className="ml-auto flex shrink-0 items-center gap-1.5 justify-self-end whitespace-nowrap will-change-transform md:ml-0 xl:[transform:translate3d(0,calc((1-var(--hp))*-80px),0)]">
               {tools}
             </div>
           </div>

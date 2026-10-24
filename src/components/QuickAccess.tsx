@@ -40,7 +40,7 @@ export default function QuickAccess({ games }: { games: GameCardData[] }) {
   return (
     <section aria-label="Khám phá nhanh" className="mx-auto mt-4 max-w-6xl px-4">
       <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
-        <h2 className="font-display text-lg font-bold tracking-tight">Khám phá nhanh</h2>
+        <h2 className="neon-title font-display text-lg font-bold tracking-tight">Khám phá nhanh</h2>
         {latest && <p className="text-xs tabular-nums text-haze">Cập nhật gần nhất: {fmtDate(latest)}</p>}
       </div>
 

@@ -19,7 +19,7 @@ export default function SimilarGames({ current, all }: { current: Game; all: Gam
 
   return (
     <section>
-      <h2 className="mb-3 px-1 font-display text-xl font-bold tracking-tight">Game tương tự</h2>
+      <h2 className="neon-title mb-3 px-1 font-display text-xl font-bold tracking-tight">Game tương tự</h2>
       <ul className="space-y-2">
         {list.map((g) => (
           <li key={g.slug}>

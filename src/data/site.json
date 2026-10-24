@@ -86,5 +86,10 @@
     "Erotic",
     "NSFW",
     "No AI"
-  ]
+  ],
+  "popup": {
+    "enabled": false,
+    "title": "Thông báo",
+    "text": ""
+  }
 }

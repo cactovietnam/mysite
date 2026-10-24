@@ -67,7 +67,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
       <ViewTracker slug={game.slug} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       {/* Hero: ảnh CHÍNH rõ nét bên phải, bị "che" dần bằng lớp tối từ trái sang và từ dưới lên */}
-      <section className="relative isolate -mt-14 flex min-h-[560px] md:min-h-[min(82vh,760px)] items-end overflow-hidden">
+      <section className="relative isolate -mt-16 md:-mt-[168px] flex min-h-[560px] md:min-h-[min(82vh,760px)] items-end overflow-hidden">
         <div aria-hidden className="absolute inset-0 -z-10 bg-cover"
              style={game.blur ? { backgroundImage: `url("${game.blur}")` } : undefined}>
           <Cover decorative priority src={game.cover} title={game.title} engine={game.engine}
@@ -79,10 +79,10 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           <div className="absolute inset-0 md:hidden"
                style={{ background: "linear-gradient(180deg, rgba(15,12,26,0.45) 0%, rgba(15,12,26,0) 24%, rgba(15,12,26,0.85) 62%, #0f0c1a 100%)" }} />
           <div className="absolute inset-0"
-               style={{ background: "linear-gradient(0deg, #0f0c1a 0%, rgba(15,12,26,0) 20%), linear-gradient(180deg, rgba(15,12,26,0.6) 0%, rgba(15,12,26,0) 18%)" }} />
+               style={{ background: "linear-gradient(0deg, #0f0c1a 0%, rgba(15,12,26,0) 20%), linear-gradient(180deg, rgba(15,12,26,0.75) 0%, rgba(15,12,26,0) 34%)" }} />
         </div>
 
-        <div className="mx-auto w-full max-w-6xl px-4 pb-12 pt-32">
+        <div className="mx-auto w-full max-w-6xl px-4 pb-12 pt-32 md:pt-48">
           <Link href="/" className="glass inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition hover:bg-white/15">
             <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="m12 4-6 6 6 6" />
@@ -151,7 +151,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           {/* Mỗi phần tử content = 1 khổ (thẻ <p> riêng). contentFold > 0: các khổ sau khổ đó ẩn sau nút "Xem thêm" */}
           {game.content.length > 0 && (
             <section>
-              <h2 className="mb-3 font-display text-3xl font-bold tracking-tight">Nội dung game</h2>
+              <h2 className="neon-title mb-3 font-display text-3xl font-bold tracking-tight">Nội dung game</h2>
               <ExpandableContent paragraphs={game.content} fold={game.contentFold} />
             </section>
           )}
@@ -160,7 +160,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           {game.images.length > 0 && (
             <section id="hinh-anh" className="scroll-mt-24">
               <div className="mb-4 flex items-end justify-between">
-                <h2 className="font-display text-3xl font-bold tracking-tight">Ảnh trong game</h2>
+                <h2 className="neon-title font-display text-3xl font-bold tracking-tight">Ảnh trong game</h2>
                 <span className="text-sm text-haze">{game.images.length} ảnh</span>
               </div>
               <Gallery images={game.images} title={game.title} />

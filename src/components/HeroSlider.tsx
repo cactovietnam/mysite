@@ -56,7 +56,7 @@ export default function HeroSlider({ games }: { games: SlideData[] }) {
       }}
     >
       <div
-        className="relative isolate h-[520px] overflow-hidden rounded-[2.5rem] border border-white/10 bg-plum md:h-[560px]"
+        className="relative isolate h-[520px] overflow-hidden rounded-[2.5rem] border border-[#8b5cf6]/25 bg-plum md:h-[560px]"
         onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
         onTouchEnd={(e) => {
           if (touchX.current === null || !multi) return;

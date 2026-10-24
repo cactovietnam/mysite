@@ -61,7 +61,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
     return (
       <button key={id} onClick={() => update({ engine: id === "all" ? null : id })} aria-pressed={on}
               className={`rounded-full px-4 py-2 text-sm font-medium transition duration-300 ${
-                on ? "bg-mist text-ink" : "glass text-mist/80 hover:bg-white/10 hover:text-mist"}`}>
+                on ? "bg-gradient-to-r from-[#2af5d6] to-[#ff2e93] text-ink" : "glass text-mist/80 hover:bg-white/10 hover:text-mist"}`}>
         {label} <span className={on ? "text-ink/55" : "text-haze"}>{count}</span>
       </button>
     );

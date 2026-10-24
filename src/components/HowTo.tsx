@@ -14,7 +14,7 @@ export default function HowTo() {
 
   return (
     <section id="huong-dan" className="mx-auto max-w-6xl scroll-mt-24 px-4 pb-24">
-      <h2 className="mb-6 font-display text-3xl font-bold tracking-tight">Cách tải và chơi</h2>
+      <h2 className="neon-title mb-6 font-display text-3xl font-bold tracking-tight">Cách tải và chơi</h2>
 
       <ol className="grid gap-4 md:grid-cols-3">
         {STEPS.map((s, i) => (

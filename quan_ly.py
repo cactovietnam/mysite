@@ -74,6 +74,7 @@ SITE_DEFAULT = {
              "announcementLabel": "Thông báo"},
     "ageGate": {"enabled": True, "remember": "never"},
     "donate": DONATE_DEFAULT,
+    "popup": {"enabled": False, "title": "Thông báo", "text": ""},
     "engines": {"Ren'Py": "#fb923c", "RPGM": "#2dd4bf", "Unity": "#60a5fa", "Unreal": "#9ca3af"},
     "tagPresets": ["2DCG", "3DCG", "Animation", "Anime", "Visual Novel", "RPG", "Simulation", "Management", "Adventure",
                    "Puzzle", "Sandbox", "Action", "Turn-Based", "Fantasy", "Horror", "Comedy", "School Life",
@@ -89,7 +90,7 @@ SITE_FIELDS = [
     ("description", "Mô tả website (SEO)", "text"),
     ("discord", "Link Discord, hiện trong nút Báo lỗi (trống = ẩn)", "url"),
     ("facebook", "Link Facebook, hiện trong nút Báo lỗi (trống = ẩn)", "url"),
-    ("tagline", "Dòng giới thiệu ngắn cạnh logo to ở đầu trang (trống = ẩn)", "text"),
+    ("tagline", "Dòng phụ dưới chữ GSVH ở logo to (trống = mặc định 'Việt hóa game · Gaming community'; dấu · chia 2 màu trắng/xanh)", "text"),
     ("footer", "Dòng chân trang", "text"),
     ("nav.explore", "Menu: chữ 'Khám phá'", "text"),
     ("nav.discord", "Menu: chữ nút Discord", "text"),
@@ -98,8 +99,11 @@ SITE_FIELDS = [
     ("home.featuredBadge", "Nhãn game mới cập nhật", "text"),
     ("home.featuredButton", "Chữ nút 'Xem game'", "text"),
     ("home.sliderSeconds", "Slider: số giây tự chuyển game (2-30)", "seconds"),
-    ("home.announcement", "Thanh thông báo dưới slider ('-' = ẩn)", "text"),
+    ("home.announcement", "Thanh thông báo dưới slider, cũng hiện trong chuông ('-' = ẩn)", "text"),
     ("home.announcementLabel", "Nhãn thanh thông báo", "text"),
+    ("popup.enabled", "Bảng thông báo hiện MỖI LẦN vào web (game mới chỉ báo qua chuông, không qua bảng này)", "bool"),
+    ("popup.title", "Bảng thông báo: tiêu đề", "text"),
+    ("popup.text", "Bảng thông báo: nội dung (gõ \\n để xuống dòng)", "multi"),
     ("ageGate.enabled", "Cổng xác nhận 18+", "bool"),
     ("ageGate.remember", "Cổng 18+: khi nào hỏi lại (bấm số để đổi)", "choice"),
 ]
@@ -884,7 +888,7 @@ def do_site():
         print("\n--- CHỮ & LINK TRÊN WEB (Enter = xong) ---")
         for i, (p, label, kind) in enumerate(SITE_FIELDS, 1):
             v = deep_get(site, p)
-            shown = ("Bật" if v else "Tắt") if kind == "bool" else REMEMBER_LABEL.get(v, v) if kind == "choice" else (v or "(trống)")
+            shown = ("Bật" if v else "Tắt") if kind == "bool" else REMEMBER_LABEL.get(v, v) if kind == "choice" else (str(v).replace("\n", " ⏎ ") or "(trống)")
             print(f"  {i:>2}. {label}: {shown}")
         ni = ask_nums("Số mục cần sửa: ", len(SITE_FIELDS))
         if not ni: return changed
@@ -908,6 +912,7 @@ def do_site():
                 if kind in ("req", "url_req"): print("  ! Mục này không được để trống."); continue
                 v = ""
             if kind.startswith("url") and v: v = norm_url(v)
+            if kind == "multi": v = v.replace("\\n", "\n")   # gõ \n = xuống dòng
             deep_set(site, p, v)
         write_json(SITE, site); changed = True
         print("  ✓ Đã lưu. Nhớ đẩy lên Vercel để web đổi theo.")
@@ -1362,7 +1367,7 @@ def do_errors():
 # --- menu cmd 7 ---
 CMD7_MENU = """
 === CMD 7: CÀI ĐẶT WEB & TÀI KHOẢN ===
- [1] Chữ & link trên web (tên web, Discord, Facebook, chân trang, menu...)   -> cần đẩy lên Vercel [9]
+ [1] Chữ & link trên web (tên web, Discord, Facebook, chân trang, menu, bảng thông báo...)   -> cần đẩy lên Vercel [9]
  [2] Báo lỗi về Discord (bật/tắt, webhook, chống trùng, gửi thử)             -> có hiệu lực ngay
  [3] Khóa đăng nhập (số lần sai tối đa, thời gian khóa)                      -> có hiệu lực ngay
  [4] Quản lý tài khoản (tìm, mở khóa, đổi mật khẩu, quyền quản trị)
@@ -1419,6 +1424,8 @@ def main():
         s.setdefault("donate", dict(DONATE_DEFAULT)).setdefault("cardTitle", DONATE_DEFAULT["cardTitle"])
         s.setdefault("nav", {}).setdefault("donate", "DONATE")
         write_json(SITE, s); print("  (Đã thêm mục Donate mẫu vào src/data/site.json, sửa ở CMD 7 > [6])")
+    if "popup" not in s:  # site.json cũ chưa có bảng thông báo
+        s["popup"] = dict(SITE_DEFAULT["popup"]); write_json(SITE, s); print("  (Đã thêm mục Bảng thông báo vào src/data/site.json, sửa ở CMD 7 > [1])")
     actions = {"1": do_add_game, "2": do_edit_game, "3": do_links, "4": do_images, "5": do_manage_images,
                "6": do_delete_games, "7": do_cmd7, "8": do_check}
     changed = False

@@ -21,7 +21,7 @@ export default function Home() {
       <QuickAccess games={cards} />
       <section id="kho-game" className="mx-auto max-w-6xl scroll-mt-24 px-4 pb-20 pt-16">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display text-3xl font-bold tracking-tight">{site.home.libraryTitle}</h2>
+          <h2 className="neon-title font-display text-3xl font-bold tracking-tight">{site.home.libraryTitle}</h2>
           <RandomGame slugs={sorted.map((g) => g.slug)} />
         </div>
         <Library games={cards} />

@@ -36,7 +36,7 @@ export default function FilterPanel({ filters, tagIndex, dirty, onChange, onClea
   return (
     <section aria-label="Bộ lọc game" className={`glass divide-y divide-white/10 rounded-[1.75rem] ${className}`}>
       <div className="flex items-center justify-between gap-3 px-5 py-4">
-        <h2 className="font-display text-lg font-bold tracking-tight">Bộ lọc</h2>
+        <h2 className="neon-title font-display text-lg font-bold tracking-tight">Bộ lọc</h2>
         {dirty && (
           <button type="button" onClick={() => { onClear(); setTagQ(""); }}
                   className="rounded-full px-2 py-1 text-xs font-semibold text-berry transition hover:bg-white/10">

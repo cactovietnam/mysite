@@ -12,7 +12,7 @@ export default function Footer() {
 
   return (
     <footer className="mx-auto w-full max-w-6xl px-4 pb-10 pt-4 text-sm">
-      <div className="border-t border-white/10 pt-10">
+      <div className="border-t border-[#8b5cf6]/25 pt-10">
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
             <Brand />

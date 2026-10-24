@@ -1,6 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Be_Vietnam_Pro } from "next/font/google";
+import { Bricolage_Grotesque, Be_Vietnam_Pro, Orbitron, Barlow_Condensed } from "next/font/google";
 import Link from "next/link";
 import SearchBox from "@/components/SearchBox";
 import AccountMenu from "@/components/AccountMenu";
@@ -13,12 +13,18 @@ import NavLinks from "@/components/NavLinks";
 import ReloadReset from "@/components/ReloadReset";
 import ClientErrorReporter from "@/components/ClientErrorReporter";
 import FavSync from "@/components/FavSync";
+import NotificationBell from "@/components/NotificationBell";
+import OnlineCount from "@/components/OnlineCount";
+import PopupNotice from "@/components/PopupNotice";
+import { LOGO } from "@/lib/logos";
 import { games } from "@/data/games";
 import { site, siteUrl } from "@/data/site";
 import { donateConfig, donateNavLabel } from "@/data/donate";
 
 const display = Bricolage_Grotesque({ subsets: ["latin", "vietnamese"], variable: "--font-bricolage" });
 const sans = Be_Vietnam_Pro({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-bevn" });
+const orbitron = Orbitron({ subsets: ["latin"], weight: ["800"], variable: "--font-orbitron" }); // chữ GSVH
+const barlow = Barlow_Condensed({ subsets: ["latin", "vietnamese"], weight: ["600"], variable: "--font-barlow" }); // dòng phụ dưới logo
 
 export const metadata: Metadata = {
   metadataBase: siteUrl, // để ảnh Open Graph dạng /covers/... thành link tuyệt đối
@@ -28,28 +34,28 @@ export const metadata: Metadata = {
 };
 
 // Dòng giới thiệu ngắn cạnh logo to (site.json -> tagline, sửa ở quan_ly.py mục 7; trống = ẩn).
-const tagline = (site as unknown as { tagline?: string }).tagline?.trim() || undefined;
+const tagline = (site as unknown as { tagline?: string }).tagline?.trim() || "Việt hóa game · Gaming community";
+const notice = (site.home as { announcement?: string }).announcement?.trim() ?? "";
+const latest = [...games].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 3)
+  .map(({ slug, title, updatedAt }) => ({ slug, title, updatedAt })); // chuông thông báo: 3 game mới nhất
 
 const engines = Array.from(new Set(games.map((g) => g.engine))); // tab engine trên menu: tự theo dữ liệu game
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi" className={`${display.variable} ${sans.variable}`}>
+    <html lang="vi" className={`${display.variable} ${sans.variable} ${orbitron.variable} ${barlow.variable}`}>
       <body className="flex min-h-dvh flex-col font-sans antialiased">
         <ClientErrorReporter />
         <ReloadReset />
         <FavSync />
         {site.ageGate.enabled && <AgeGate />}
+        <PopupNotice />
         <HeaderShell
           brand={<Brand />}
           nav={<NavLinks engines={engines} />}
-          tagline={tagline}
+          brandBig={<Brand sub={tagline} />}
           tools={
             <>
-              {/^https?:\/\//i.test(site.discord) && (
-                <a href={site.discord} target="_blank" rel="noopener noreferrer"
-                   className="hidden rounded-full px-4 py-2 text-sm text-mist/80 transition hover:bg-white/10 hover:text-mist lg:block">{site.nav.discord}</a>
-              )}
               {donateConfig.enabled && (
                 <Link href="/donate" aria-label={donateNavLabel} title={donateNavLabel}
                       className="grid size-10 place-items-center rounded-full text-berry transition hover:bg-white/10 md:hidden">
@@ -59,7 +65,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </Link>
               )}
               <SearchBox />
-              <AccountMenu />
+              {/^https?:\/\//i.test(site.discord) && (
+                <a href={site.discord} target="_blank" rel="noopener noreferrer"
+                   className="hidden items-center gap-2 rounded-full px-4 py-2 text-sm text-slate-300 transition hover:bg-white/10 hover:text-white lg:flex">
+                  <svg viewBox="0 0 24 24" className="size-4 text-white" fill="currentColor" aria-hidden><path d={LOGO.discord.d} /></svg>
+                  {site.nav.discord}
+                </a>
+              )}
+              <NotificationBell notice={notice} items={latest} />
+              <div className="relative">
+                <AccountMenu />
+                <OnlineCount />
+              </div>
             </>
           }
         />

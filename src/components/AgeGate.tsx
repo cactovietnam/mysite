@@ -25,6 +25,7 @@ const read = () => {
   if (memoryOk) return true;
   try { return storage()?.getItem(KEY) === "1"; } catch { return false; }
 };
+export const useAgeOk = () => useSyncExternalStore(subscribe, read, () => false);
 
 // Cổng xác nhận 18+: phải tick ô đồng ý rồi mới bấm vào được. Server luôn render cổng, client ẩn nếu đã xác nhận.
 export default function AgeGate() {

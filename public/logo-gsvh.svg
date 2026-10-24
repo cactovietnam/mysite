@@ -1,0 +1,50 @@
+<svg width="120" height="128" viewBox="0 0 120 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="shieldBorder" x1="0" y1="0" x2="120" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2AF5D6" />
+      <stop offset="55%" stop-color="#E2E8F0" />
+      <stop offset="100%" stop-color="#FF2E93" />
+    </linearGradient>
+    <linearGradient id="padStroke" x1="12" y1="44" x2="108" y2="96" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2AF5D6" />
+      <stop offset="100%" stop-color="#FF2E93" />
+    </linearGradient>
+  </defs>
+
+  <!-- Viền khiên ngoài -->
+  <path d="M60 6L16 22V60C16 90 35 112 60 122C85 112 104 90 104 60V22L60 6Z" fill="#0F1021" stroke="url(#shieldBorder)" stroke-width="3.5" stroke-linejoin="round" />
+  
+  <!-- Lõi khiên 2 nửa màu -->
+  <path d="M60 13L23 27V59C23 84.5 39 104 60 113.5V13Z" fill="#7C164E" />
+  <path d="M60 13L97 27V59C97 84.5 81 104 60 113.5V13Z" fill="#520F36" />
+
+  <!-- Thân tay cầm 2D -->
+  <path d="M34 42H86C96 42 103 50 105 62L108 82C109.5 91 102 98 94 96C88 94.5 85 88 81 82H39C35 88 32 94.5 26 96C18 98 10.5 91 12 82L15 62C17 50 24 42 34 42Z" fill="#14182B" stroke="url(#padStroke)" stroke-width="3" stroke-linejoin="round" />
+
+  <!-- Nút cò trên (Bumpers) -->
+  <path d="M28 42C30 37 38 37 42 42" stroke="#2AF5D6" stroke-width="2.5" stroke-linecap="round" />
+  <path d="M78 42C82 37 90 37 92 42" stroke="#FF2E93" stroke-width="2.5" stroke-linecap="round" />
+
+  <!-- Touchpad giữa -->
+  <rect x="49" y="46" width="22" height="11" rx="2.5" fill="#2AF5D6" />
+  <circle cx="45" cy="51" r="1.8" fill="#94A3B8" />
+  <circle cx="75" cy="51" r="1.8" fill="#94A3B8" />
+
+  <!-- Cụm D-Pad bên trái -->
+  <circle cx="31" cy="60" r="10.5" fill="#0D1021" stroke="#2AF5D6" stroke-width="1.5" />
+  <path d="M31 53V67M24 60H38" stroke="#CBD5E1" stroke-width="3.5" stroke-linecap="round" />
+
+  <!-- Cụm 4 nút bấm bên phải -->
+  <circle cx="89" cy="60" r="10.5" fill="#0D1021" stroke="#FF2E93" stroke-width="1.5" />
+  <circle cx="89" cy="54" r="2.3" fill="#2AF5D6" />
+  <circle cx="95" cy="60" r="2.3" fill="#FF2E93" />
+  <circle cx="89" cy="66" r="2.3" fill="#38BDF8" />
+  <circle cx="83" cy="60" r="2.3" fill="#F472B6" />
+
+  <!-- 2 cần Analog -->
+  <circle cx="45" cy="74" r="7.5" fill="#0D1021" stroke="#94A3B8" stroke-width="2" />
+  <circle cx="45" cy="74" r="4.5" fill="#2AF5D6" />
+
+  <circle cx="75" cy="74" r="7.5" fill="#0D1021" stroke="#FF2E93" stroke-width="2" />
+  <circle cx="75" cy="74" r="4.5" fill="#9D174D" />
+</svg>

@@ -716,7 +716,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 
 
-
 === FILE: src/app/not-found.tsx ===
 
 import Link from "next/link";
@@ -3092,13 +3091,6 @@ import ReportMenu from "./ReportMenu";
 
 type Tile = { id: string; label: string; count: number; dot: string; search: string };
 
-const arrow = (
-  <svg viewBox="0 0 20 20" className="size-4 shrink-0 text-haze transition duration-300 group-hover:translate-x-0.5 group-hover:text-mist"
-       fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d="M4 10h12m0 0-4-4m4 4-4 4" />
-  </svg>
-);
-
 // Lối tắt vào Kho game: mỗi ô là một bộ lọc dựng sẵn (engine, Việt hóa, Cheat) kèm số game thật,
 // bấm là cuộn xuống Kho game và lọc ngay. Số liệu tự tính từ games.json, không cần sửa tay.
 export default function QuickAccess({ games }: { games: GameCardData[] }) {
@@ -3127,33 +3119,24 @@ export default function QuickAccess({ games }: { games: GameCardData[] }) {
 
   return (
     <section aria-label="Khám phá nhanh" className="mx-auto mt-4 max-w-6xl px-4">
-      <div className="mb-3 flex items-baseline justify-between gap-3 px-1">
+      <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
         <h2 className="font-display text-lg font-bold tracking-tight">Khám phá nhanh</h2>
         {latest && <p className="text-xs tabular-nums text-haze">Cập nhật gần nhất: {fmtDate(latest)}</p>}
       </div>
 
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <ul className="flex flex-wrap items-center gap-2">
         {tiles.map((t) => (
           <li key={t.id}>
             <Link href={`/${t.search}#kho-game`} onClick={(e) => softNav(e, pathname, t.search, "library")}
-                  className="glass group flex h-full items-center justify-between gap-3 rounded-2xl px-5 py-4 transition duration-300 hover:-translate-y-0.5 hover:bg-white/10 active:scale-[0.98]">
-              <span className="min-w-0">
-                <span className="flex items-center gap-2 text-sm text-haze">
-                  <i aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: t.dot, boxShadow: `0 0 10px ${t.dot}` }} />
-                  <span className="truncate">{t.label}</span>
-                </span>
-                <span className="mt-1 block font-display text-2xl font-extrabold tabular-nums tracking-tight sm:text-3xl">
-                  {t.count}<span className="ml-1.5 text-sm font-medium text-haze">game</span>
-                </span>
-              </span>
-              {arrow}
+                  className="glass group flex items-center gap-2 rounded-full py-2 pl-3.5 pr-4 text-sm transition duration-300 hover:-translate-y-0.5 hover:bg-white/10 active:scale-95">
+              <i aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: t.dot, boxShadow: `0 0 10px ${t.dot}` }} />
+              <span className="text-haze transition group-hover:text-mist">{t.label}</span>
+              <span className="font-display font-extrabold tabular-nums">{t.count}</span>
             </Link>
           </li>
         ))}
 
-        {(hasDiscord || hasFacebook) && (
-          <li className="col-span-2 sm:col-span-1"><ReportMenu variant="tile" /></li>
-        )}
+        {(hasDiscord || hasFacebook) && <li><ReportMenu variant="tile" /></li>}
       </ul>
     </section>
   );
@@ -3225,7 +3208,8 @@ function Logo({ id, className }: { id: keyof typeof LOGO; className: string }) {
 type Opt = { id: keyof typeof LOGO; name: string; url: string; note: string };
 
 // Nút "Báo lỗi": bấm vào hiện 2 lựa chọn Discord / Facebook (link lấy từ site.json, trống thì ẩn lựa chọn đó).
-// variant "tile": ô trong Khám phá nhanh. "pill": nút ở trang game.
+// variant "tile": chip trong Khám phá nhanh, 2 icon bấm thẳng tới Discord/Facebook (không qua popup).
+// variant "pill": nút ở trang game, vẫn mở popup để nhắc kèm tên game + link lỗi.
 export default function ReportMenu({ variant, game }: { variant: "tile" | "pill"; game?: string }) {
   const [open, setOpen] = useState(false);
   const modalRef = useModal(open, () => setOpen(false)); // khóa cuộn, nhốt Tab, Esc đóng, trả focus
@@ -3239,21 +3223,17 @@ export default function ReportMenu({ variant, game }: { variant: "tile" | "pill"
   return (
     <>
       {variant === "tile" ? (
-        <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog"
-                className="group relative flex h-full w-full items-center justify-between gap-3 overflow-hidden rounded-2xl border border-white/10 px-5 py-4 text-left transition duration-300 hover:-translate-y-0.5 active:scale-[0.98]"
-                style={{ background: "linear-gradient(135deg, rgba(88,101,242,0.34), rgba(24,119,242,0.2)), rgba(30,24,56,0.84)" }}>
-          <span className="min-w-0">
-            <span className="block font-display text-lg font-bold tracking-tight">Báo lỗi</span>
-            <span className="mt-0.5 block text-xs leading-snug text-mist/75">Qua {opts.map((o) => o.name).join(" hoặc ")}</span>
-          </span>
-          <span className="flex shrink-0 -space-x-2">
-            {opts.map((o) => (
-              <span key={o.id} className="grid size-8 place-items-center rounded-full text-white ring-2 ring-[#1b1535]" style={{ background: LOGO[o.id].color }}>
-                <Logo id={o.id} className="size-4" />
-              </span>
-            ))}
-          </span>
-        </button>
+        <div className="glass flex items-center gap-2 rounded-full py-1 pl-4 pr-1">
+          <span className="text-sm text-haze">Báo lỗi</span>
+          {opts.map((o) => (
+            <a key={o.id} href={o.url} target="_blank" rel="noopener noreferrer"
+               aria-label={`Báo lỗi qua ${o.name}`} title={o.name}
+               className="grid size-8 place-items-center rounded-full text-white transition duration-300 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+               style={{ background: LOGO[o.id].color }}>
+              <Logo id={o.id} className="size-4" />
+            </a>
+          ))}
+        </div>
       ) : (
         <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog"
                 className="glass rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15">
@@ -3261,7 +3241,7 @@ export default function ReportMenu({ variant, game }: { variant: "tile" | "pill"
         </button>
       )}
 
-      {open && createPortal(
+      {variant === "pill" && open && createPortal(
         <div className="anim-fade fixed inset-0 z-50 grid place-items-center bg-ink/75 p-4 md:backdrop-blur-sm" onClick={() => setOpen(false)}>
           <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Báo lỗi"
                className="glass anim-pop w-full max-w-md rounded-[2rem] p-5 shadow-2xl shadow-black/50"
@@ -3744,6 +3724,53 @@ export const donateNavLabel = str(nav.donate) || "DONATE";
     "contentFold": 0,
     "blur": "data:image/webp;base64,UklGRqIAAABXRUJQVlA4IJYAAACQBQCdASogABIAPu1mqk2ppaQiMAgBMB2JZwDO7CLEVlEyMO8X2S4ICKiVOIzLPt0TCxcvUAD+YRCo9mHkKzrrAtZg+iBqngR8jxfZx699fj8yEKTCErlBHNP1Wh1jttoCEq0nOQbQoJPupMmBnNHv/o4FLwtz+6zBj0vMG5d86eKn/jVRetQBtGnS+2FMgKk7mSzeAAA=",
     "thumb": "/covers/ntr-office/b87cd1ee44_t.webp"
+  },
+  {
+    "slug": "king-of-summer",
+    "title": "King of summer",
+    "engine": "Ren'Py",
+    "version": "0.7.1",
+    "sizeGB": 7.8,
+    "cover": "/covers/king-of-summer/b132af95df.webp",
+    "images": [
+      "/covers/king-of-summer/f076b0b05a.webp",
+      "/covers/king-of-summer/3d029e4e24.webp",
+      "/covers/king-of-summer/abdbc44d9c.webp",
+      "/covers/king-of-summer/26aa3ed78a.webp",
+      "/covers/king-of-summer/741d8bb836.webp",
+      "/covers/king-of-summer/d31992182b.webp"
+    ],
+    "tags": [
+      "3dcg",
+      "ahegao",
+      "anal sex",
+      "animated",
+      "big ass",
+      "big tits",
+      "ntr",
+      "18+",
+      "việt hóa",
+      "oral sex",
+      "swinging",
+      "titfuck",
+      "vaginal sex"
+    ],
+    "intro": "Satoshi và Mary là một cặp đôi sinh viên đại học đang hạnh phúc trong tình yêu, sẵn sàng cho kỳ nghỉ hè đầu tiên cùng nhau. Một ngày nọ, Satoshi nhận được một email từ người chú tên Kendo, mời cậu đến nghỉ vài tuần cùng chú tại Naval Treasure Resort, một khu nghỉ dưỡng mùa hè sang trọng, và được đài thọ toàn bộ chi phí. Vô cùng vui sướng, Satoshi và Mary liền lên đường tới đó, sẵn sàng tận hưởng kỳ nghỉ của mình một cách trọn vẹn nhất.",
+    "content": [
+      "Satoshi và Mary là một cặp đôi sinh viên đại học đang hạnh phúc trong tình yêu, sẵn sàng cho kỳ nghỉ hè đầu tiên cùng nhau. Một ngày nọ, Satoshi nhận được một email từ người chú tên Kendo, mời cậu đến nghỉ vài tuần cùng chú tại Naval Treasure Resort, một khu nghỉ dưỡng mùa hè sang trọng, và được đài thọ toàn bộ chi phí. Vô cùng vui sướng, Satoshi và Mary liền lên đường tới đó, sẵn sàng tận hưởng kỳ nghỉ của mình một cách trọn vẹn nhất."
+    ],
+    "contentFold": 0,
+    "updatedAt": "2026-10-23",
+    "links": [
+      {
+        "label": "",
+        "url": "https://gofile.io/d/IesvEB9S"
+      }
+    ],
+    "accent": "#6cbfda",
+    "accent2": "#e87040",
+    "blur": "data:image/webp;base64,UklGRtIAAABXRUJQVlA4IMYAAADwBQCdASogABIAPu1kq0+ppSOiMBgIATAdiWwAsR7VQXBC8ogO+ouwbDGdCgqEiQhSnOWA8XDcWAD31VQIZiKx8+qfjReWXzGCD6W3qdrqKxnLxo/tCXcM1/W4vts+6z9Q9paMWkvqjMjZUnf25Sq7P/oVssrC6kfFkucyvjYaB45YFYp3UB/UbWOdRbLs0r3wod4veUAwumTFc43smdGs/XAxnMFKJUxGbJkV04oCQHshBrjRsX11MFP98jwRfaVzu30ESAA=",
+    "thumb": "/covers/king-of-summer/b132af95df_t.webp"
   }
 ]
 
@@ -3827,7 +3854,9 @@ export const games: Game[] = (data as unknown as Raw[]).map(({ description, ...g
   "url": "https://gsvhvn.vercel.app",
   "description": "Danh sách game và hướng dẫn cài đặt.",
   "discord": "https://discord.gg/",
+  "facebook": "https://www.facebook.com/profile.php?id=61591215583142",
   "footer": "© 2026 GSVH",
+  "tagline": "",
   "nav": {
     "explore": "Khám phá",
     "discord": "Discord",
@@ -3845,6 +3874,18 @@ export const games: Game[] = (data as unknown as Raw[]).map(({ description, ...g
   "ageGate": {
     "enabled": true,
     "remember": "never"
+  },
+  "donate": {
+    "enabled": true,
+    "title": "DONATE",
+    "subtitle": "Cùng tiếp sức cho những bản Việt hóa mới.",
+    "cardTitle": "Ủng hộ GSVH",
+    "qrImage": "/donate-qr.png",
+    "qrNote": "Quét mã QR bằng ứng dụng ngân hàng để ủng hộ.",
+    "bankName": "MBBank",
+    "accountNumber": "039903780868",
+    "accountHolder": "NGUYEN DINH NGUYEN",
+    "transferContent": "Ten nguoi gui + game muon dich"
   },
   "engines": {
     "Ren'Py": "#fb923c",
@@ -3896,20 +3937,7 @@ export const games: Game[] = (data as unknown as Raw[]).map(({ description, ...g
     "Erotic",
     "NSFW",
     "No AI"
-  ],
-  "facebook": "https://www.facebook.com/profile.php?id=61591215583142",
-  "donate": {
-    "enabled": true,
-    "title": "DONATE",
-    "subtitle": "Cùng tiếp sức cho những bản Việt hóa mới.",
-    "cardTitle": "Ủng hộ MySite",
-    "qrImage": "/donate-qr.png",
-    "qrNote": "Quét mã QR bằng ứng dụng ngân hàng để ủng hộ.",
-    "bankName": "TÊN NGÂN HÀNG",
-    "accountNumber": "0000000000",
-    "accountHolder": "TEN CHU TAI KHOAN",
-    "transferContent": "TÊN CỦA NGƯỜI GỬI"
-  }
+  ]
 }
 
 
