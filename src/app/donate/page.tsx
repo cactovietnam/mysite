@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { site } from "@/data/site";
 import { donateConfig } from "@/data/donate";
 import DonateCard from "@/components/DonateCard";
+import PayDonate from "@/components/PayDonate";
 
 export const metadata: Metadata = {
   title: "Donate — Ủng hộ " + site.name,
@@ -21,6 +22,8 @@ export default function DonatePage() {
         </h1>
         {donateConfig.subtitle && <p className="mt-3 text-base text-haze sm:text-lg">{donateConfig.subtitle}</p>}
       </div>
+      {/* QR tự động theo từng đơn; DonateCard bên dưới là QR tĩnh dự phòng */}
+      <PayDonate />
       <DonateCard cfg={donateConfig} />
     </main>
   );

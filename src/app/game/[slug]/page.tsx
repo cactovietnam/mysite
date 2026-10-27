@@ -9,6 +9,7 @@ import Cover from "@/components/Cover";
 import DownloadPanel from "@/components/DownloadPanel";
 import EngineChip from "@/components/EngineChip";
 import FavoriteButton from "@/components/FavoriteButton";
+import BuyKeyButton from "@/components/BuyKeyButton";
 import ViewTracker from "@/components/ViewTracker";
 import ExpandableContent from "@/components/ExpandableContent";
 import { AdultChip, PatchChip } from "@/components/GameBadges";
@@ -119,6 +120,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <DownloadPanel slug={game.slug} title={game.title} hasLinks={game.links.some((l) => /^https?:\/\//i.test(l.url))} />
             <FavoriteButton slug={game.slug} variant="pill" />
+            <BuyKeyButton slug={game.slug} />
             <ReportMenu variant="pill" game={game.title} />
             {game.images.length > 0 && (
               <a href="#hinh-anh" className="glass rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15">

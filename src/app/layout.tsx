@@ -14,6 +14,7 @@ import ReloadReset from "@/components/ReloadReset";
 import ClientErrorReporter from "@/components/ClientErrorReporter";
 import FavSync from "@/components/FavSync";
 import NotificationBell from "@/components/NotificationBell";
+import CartButton from "@/components/CartButton";
 import OnlineCount from "@/components/OnlineCount";
 import PopupNotice from "@/components/PopupNotice";
 import PageTransition from "@/components/PageTransition";
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   {site.nav.discord}
                 </a>
               )}
+              <CartButton />
               <NotificationBell notice={notice} items={latest} />
               <div className="relative">
                 <AccountMenu />
