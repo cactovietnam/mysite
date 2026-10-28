@@ -284,5 +284,28 @@
     "accent": "#f8514f",
     "accent2": "#db9c4c",
     "blur": "data:image/webp;base64,UklGRroAAABXRUJQVlA4IK4AAAAQBACdASogAAYAPu1mq04ppaQiMAgBMB2JbACdH8Agsw2TaeRL1c0VBgD+5oTz/dC4N6scIvtnpS0Z/Ca8ej2qXH5N4GU667WlrlwgRLqMuAiXWgT+KtrHcRBQMjsQosrFUu3QzusOAs2nz8NNemykyuPsnVqXRhGeoE/uWLeOOviklKj/ZLQR5syUbqgDPxjCBCe2jYKwN64r+UF2/Acv03jxQ3sxkG7HUo8AAAA="
+  },
+  {
+    "slug": "test",
+    "title": "test",
+    "engine": "Ren'Py",
+    "version": "1.0.0",
+    "sizeGB": 1.0,
+    "cover": "/covers/test/f8f28c73ca.webp",
+    "images": [],
+    "tags": [
+      "18+"
+    ],
+    "intro": "1",
+    "content": [
+      "1"
+    ],
+    "contentFold": 0,
+    "updatedAt": "2026-10-28",
+    "links": [],
+    "accent": "#eb5c78",
+    "accent2": "#ca815e",
+    "blur": "data:image/webp;base64,UklGRpAAAABXRUJQVlA4IIQAAADQBACdASogABEAPu1qqk8ppiOiMBgIATAdiWwAtOg0X/XuACqzuqn3B+XAIHgj0AD+9o0pw/BWplihdJwveZYNxc6K/04EMWuos5Rv1emJ1R0bd9LdIZqaGhnOpPFjPXxu6Us7RtrSTCtVA0YpOXF+fznIEC100p1VdDRV6NHF08/wAAA=",
+    "thumb": "/covers/test/f8f28c73ca_t.webp"
   }
 ]
