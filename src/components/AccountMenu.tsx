@@ -1,10 +1,18 @@
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { authConfigured, getSupabase } from "@/lib/supabase";
 import { displayName, useAuthUser } from "@/lib/auth-store";
+import { games } from "@/data/games";
+import { useList } from "@/lib/user-lists";
+import { openCart } from "@/lib/cart";
+import { softNav } from "@/lib/soft-nav";
 
+const alive = (l: string[]) => l.filter((s) => games.some((g) => g.slug === s)).length; // bỏ qua game đã xóa
+const num = "rounded-full bg-white/10 px-2 py-0.5 text-xs tabular-nums text-haze";
 const item = "block w-full rounded-xl px-3 py-2 text-left text-sm text-mist/90 transition hover:bg-white/10";
+const itemRow = item.replace("block", "flex items-center justify-between");
 
 // Cạnh nút Tìm kiếm trên header. Chưa đăng nhập: nút 3 gạch, bấm ra Đăng nhập / Đăng ký.
 // Đã đăng nhập: chữ cái đầu + tên, bấm ra menu Đăng xuất. Chưa cấu hình Supabase thì không hiện gì (web chạy như cũ).
@@ -12,6 +20,9 @@ export default function AccountMenu() {
   const user = useAuthUser();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const fav = alive(useList("fav"));
+  const seen = alive(useList("seen"));
 
   useEffect(() => {
     if (!open) return;
@@ -48,10 +59,20 @@ export default function AccountMenu() {
       )}
 
       {open && (
-        <div role="menu" className="anim-pop absolute right-0 top-12 z-50 w-56 rounded-2xl border border-white/10 bg-plum p-2 shadow-2xl shadow-black/50">
+        <div role="menu" className="anim-pop absolute right-0 top-12 z-50 w-60 rounded-2xl border border-white/10 bg-plum p-2 shadow-2xl shadow-black/50">
           {user ? (
             <>
               <p className="truncate px-3 py-2 text-sm font-semibold">{name}</p>
+              <div className="my-1 border-t border-white/10" />
+              {([["fav", "Yêu thích", fav], ["seen", "Đã xem", seen]] as const).map(([k, label, n]) => (
+                <Link key={k} href={`/?list=${k}#kho-game`} role="menuitem"
+                      onClick={(e) => { setOpen(false); softNav(e, pathname, `?list=${k}`, "library"); }}
+                      className={itemRow}>
+                  {label}<span className={num}>{n}</span>
+                </Link>
+              ))}
+              <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); openCart(); }}>Giỏ hàng &amp; key đã mua</button>
+              <div className="my-1 border-t border-white/10" />
               <button type="button" role="menuitem" className={item}
                       onClick={() => { setOpen(false); void getSupabase()?.auth.signOut(); }}>
                 Đăng xuất
@@ -61,6 +82,15 @@ export default function AccountMenu() {
             <>
               <Link href="/dang-nhap" role="menuitem" onClick={() => setOpen(false)} className={item}>Đăng nhập</Link>
               <Link href="/dang-ky" role="menuitem" onClick={() => setOpen(false)} className={item}>Đăng ký</Link>
+              <div className="my-1 border-t border-white/10" />
+              {([["fav", "Yêu thích", fav], ["seen", "Đã xem", seen]] as const).map(([k, label, n]) => (
+                <Link key={k} href={`/?list=${k}#kho-game`} role="menuitem"
+                      onClick={(e) => { setOpen(false); softNav(e, pathname, `?list=${k}`, "library"); }}
+                      className={itemRow}>
+                  {label}<span className={num}>{n}</span>
+                </Link>
+              ))}
+              <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); openCart(); }}>Giỏ hàng &amp; key đã mua</button>
             </>
           )}
         </div>

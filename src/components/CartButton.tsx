@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { games } from "@/data/games";
+import { games, thumbOf } from "@/data/games";
+import { site } from "@/data/site";
 import { useModal } from "@/lib/use-modal";
 import { usePresence } from "@/lib/use-presence";
 import { getSupabase } from "@/lib/supabase";
@@ -14,6 +15,9 @@ type Status = "pending" | "paid" | "underpaid" | "expired";
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ";
 const titleOf = (slug: string) => games.find((g) => g.slug === slug)?.title ?? slug;
+const thumbIn = (slug: string) => { const g = games.find((x) => x.slug === slug); return g ? thumbOf(g) : ""; };
+const FB = /^https?:\/\//i.test(site.facebook) ? site.facebook : "";
+const TTL = 30 * 60; // khớp ORDER_TTL_MIN ở src/lib/payment.ts
 
 // Giá key (công khai) tải một lần, dùng chung cho nút "Mua key" và giỏ. Lỗi thì lần sau tải lại.
 let pricePromise: Promise<Map<string, number>> | null = null;
@@ -143,7 +147,17 @@ export default function CartButton() {
 
   const expired = !!order && (status === "expired" || left === 0);
   const oldList = Object.entries(oldKeys);
-  const cp = "rounded-full bg-white/10 px-3 py-1 text-xs transition hover:bg-white/20";
+  const cp = "shrink-0 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold transition hover:bg-white/20 active:scale-95";
+  const step = !order ? 0 : status === "paid" ? 2 : 1;
+  const title = status === "paid" && order ? "Thanh toán thành công" : order ? "Chuyển khoản" : "Giỏ hàng";
+
+  const help = FB && (
+    <a href={FB} target="_blank" rel="noopener noreferrer"
+       className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-sm transition hover:bg-white/[0.09]">
+      <span><b className="block">Chuyển xong mà không nhận được pass?</b><span className="text-xs text-haze">Nhắn Facebook kèm mã đơn <span className="font-mono">{order?.code}</span>, mình xử lý ngay.</span></span>
+      <span aria-hidden className="text-lg text-berry">&rarr;</span>
+    </a>
+  );
 
   return (
     <>
@@ -154,100 +168,145 @@ export default function CartButton() {
       </button>
 
       {mounted && createPortal(
-        <div className={`${closing ? "anim-out-fade" : "anim-fade"} fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-ink/85 p-4`} onClick={() => setOpen(false)}>
+        <div className={`${closing ? "anim-out-fade" : "anim-fade"} fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-ink/85 p-4 backdrop-blur-sm`} onClick={() => setOpen(false)}>
           <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Giỏ hàng"
-               className={`glass ${closing ? "anim-out-pop" : "anim-pop"} my-auto w-full max-w-lg rounded-[2rem] p-5 shadow-2xl shadow-black/50 sm:p-6`}
+               className={`glass ${closing ? "anim-out-pop" : "anim-pop"} relative my-auto w-full max-w-md overflow-hidden rounded-[2rem] p-5 shadow-2xl shadow-black/60 sm:p-6`}
                onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-4">
-              <h2 className="font-display text-2xl font-bold tracking-tight">{status === "paid" && order ? "Thanh toán thành công" : order ? "Quét QR để thanh toán" : "Giỏ hàng"}</h2>
+            <div aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#2af5d6] to-[#ff2e93]" />
+
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-berry to-[#7c5cff] text-ink">{cartIcon}</span>
+                <div>
+                  <h2 className="font-display text-xl font-bold leading-tight tracking-tight">{title}</h2>
+                  <p className="text-xs text-haze">{!order ? (cart.length ? `${cart.length} game trong giỏ` : "Key mật khẩu ZIP") : status === "paid" ? "Mật khẩu ZIP đã sẵn sàng" : `Đơn ${order.code}`}</p>
+                </div>
+              </div>
               <button onClick={() => setOpen(false)} aria-label="Đóng" className="grid size-9 shrink-0 place-items-center rounded-full bg-white/10 text-lg transition hover:bg-white/20">&times;</button>
             </div>
 
+            <ol aria-label="Các bước" className="mt-5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider">
+              {["Giỏ hàng", "Chuyển khoản", "Nhận key"].map((s, i) => (
+                <li key={s} className="flex flex-1 flex-col gap-1.5">
+                  <span className={`h-1 rounded-full transition-colors duration-500 ${i <= step ? "bg-gradient-to-r from-[#2af5d6] to-[#ff2e93]" : "bg-white/10"}`} />
+                  <span className={i <= step ? "text-mist" : "text-haze/70"}>{s}</span>
+                </li>
+              ))}
+            </ol>
+
             {/* ---- đã thanh toán: hiện key ---- */}
             {order && status === "paid" && (
-              <div role="status" className="mt-4 space-y-3">
-                <p className="text-sm text-haze">Đã nhận {fmt(paid ?? order.amount)}. Đây là mật khẩu ZIP của bạn (cũng xem lại được trong giỏ hàng trên trình duyệt này):</p>
+              <div role="status" className="mt-5 space-y-3">
+                <div className="flex items-center gap-3 rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+                  <svg viewBox="0 0 24 24" className="size-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="9.5" /><path d="m7.5 12.5 3 3 6-6.5" /></svg>
+                  <span>Đã nhận <b>{fmt(paid ?? order.amount)}</b>. Mật khẩu ZIP của bạn đây, xem lại được trong giỏ hàng trên trình duyệt này.</span>
+                </div>
                 {keys.length === 0 && <p className="rounded-2xl bg-white/[0.06] px-4 py-3 text-sm text-haze">Đang lấy key…</p>}
                 {keys.map((k) => (
-                  <div key={k.slug} className="rounded-2xl bg-white/[0.06] p-4">
-                    <p className="truncate text-sm text-haze">{k.title}</p>
-                    <div className="mt-1 flex items-center justify-between gap-3">
-                      <code className="break-all font-mono text-lg font-bold tracking-wide text-berry">{k.password}</code>
-                      <button type="button" onClick={() => copy(k.slug, k.password)} className={cp}>{copied === k.slug ? "Đã chép" : "Chép"}</button>
+                  <div key={k.slug} className="anim-pop flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {thumbIn(k.slug) ? <img src={thumbIn(k.slug)} alt="" className="size-14 shrink-0 rounded-xl object-cover" /> : <span className="size-14 shrink-0 rounded-xl bg-white/10" />}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs text-haze">{k.title}</p>
+                      <code className="block break-all font-mono text-lg font-bold tracking-wide text-berry">{k.password}</code>
                     </div>
+                    <button type="button" onClick={() => copy(k.slug, k.password)} className={cp}>{copied === k.slug ? "Đã chép" : "Chép"}</button>
                   </div>
                 ))}
+                {keys.length === 0 && help}
                 <button type="button" onClick={reset} className="w-full rounded-full bg-white/10 px-6 py-3 text-sm font-semibold transition hover:bg-white/20 active:scale-95">Xong</button>
               </div>
             )}
 
-            {/* ---- chờ thanh toán: QR ---- */}
+            {/* ---- chờ thanh toán ---- */}
             {order && status !== "paid" && (
-              <div className="mt-4 text-center">
-                <div className="relative mx-auto w-fit rounded-3xl bg-white p-4 shadow-lg">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={order.qr} alt={`Mã QR thanh toán ${fmt(order.amount)}`} className={`size-56 object-contain sm:size-64 ${expired ? "opacity-20" : ""}`} />
-                  {expired && <div className="absolute inset-0 grid place-items-center text-sm font-semibold text-neutral-700">Mã đã hết hạn</div>}
+              <div className="mt-5">
+                <div className="rounded-3xl border border-white/10 bg-ink/40 p-4 text-center">
+                  <p className="text-xs uppercase tracking-wider text-haze">Số tiền chính xác</p>
+                  <button type="button" onClick={() => copy("amt", String(order.amount))} title="Bấm để chép số tiền"
+                          className="mt-1 inline-flex items-center gap-2 font-display text-4xl font-extrabold tabular-nums tracking-tight transition active:scale-95">
+                    <span className="bg-gradient-to-r from-[#2af5d6] to-[#ff2e93] bg-clip-text text-transparent">{order.amount.toLocaleString("vi-VN")}đ</span>
+                    <span className="rounded-full bg-white/10 px-2.5 py-1 font-sans text-xs font-semibold text-mist">{copied === "amt" ? "Đã chép" : "Chép"}</span>
+                  </button>
+                  <div className="relative mx-auto mt-4 w-fit rounded-3xl bg-white p-3 shadow-lg shadow-black/40">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={order.qr} alt={`Mã QR thanh toán ${fmt(order.amount)}`} className={`size-52 object-contain sm:size-60 ${expired ? "opacity-20" : ""}`} />
+                    {expired && <div className="absolute inset-0 grid place-items-center text-sm font-semibold text-neutral-700">Mã đã hết hạn</div>}
+                  </div>
+                  <div className="mx-auto mt-4 h-1.5 w-full max-w-[15rem] overflow-hidden rounded-full bg-white/10" aria-hidden>
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#2af5d6] to-[#ff2e93] transition-[width] duration-1000 ease-linear" style={{ width: `${Math.min(100, (left / TTL) * 100)}%` }} />
+                  </div>
+                  <p role="status" aria-live="polite" className="mt-2 flex items-center justify-center gap-2 text-sm text-haze">
+                    {expired ? "Đơn hết hạn. Nếu đã chuyển tiền, hệ thống vẫn ghi nhận." :
+                      status === "underpaid" ? `Đã nhận ${fmt(paid ?? 0)}, còn thiếu ${fmt(order.amount - (paid ?? 0))}. Chuyển bù đúng số còn thiếu.` :
+                      <><span aria-hidden className="size-2 animate-pulse rounded-full bg-[#2af5d6]" />Đang chờ ngân hàng xác nhận · còn <b className="tabular-nums text-mist">{Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</b></>}
+                  </p>
                 </div>
-                <p role="status" aria-live="polite" className="mt-3 text-sm text-haze">
-                  {expired ? "Đơn đã hết hạn. Nếu bạn đã chuyển tiền, hệ thống vẫn sẽ ghi nhận." :
-                    status === "underpaid" ? `Đã nhận ${fmt(paid ?? 0)}, còn thiếu ${fmt(order.amount - (paid ?? 0))}. Chuyển bù đúng số còn thiếu.` :
-                    <>Đang chờ ngân hàng xác nhận… còn <b className="tabular-nums text-mist">{Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</b></>}
-                </p>
-                <dl className="mt-4 divide-y divide-white/10 rounded-2xl border border-white/10 bg-ink/40 px-4 text-left text-sm">
+
+                <dl className="mt-3 divide-y divide-white/10 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm">
                   {([
                     ["Ngân hàng", order.bank.bankName, null],
                     ["Số tài khoản", order.bank.accountNumber, "acc"],
                     ["Chủ tài khoản", order.bank.accountHolder, null],
-                    ["Số tiền chính xác", fmt(order.amount), "amt"],
                     ["Nội dung", order.code, "code"],
                   ] as const).map(([label, value, k]) => (
                     <div key={label} className="flex items-center justify-between gap-3 py-2.5">
                       <dt className="text-haze">{label}</dt>
                       <dd className="flex items-center gap-2 font-display font-bold tabular-nums">
                         <span className="break-all text-right">{value}</span>
-                        {k && <button type="button" onClick={() => copy(k, k === "amt" ? String(order.amount) : value)} className={cp}>{copied === k ? "Đã chép" : "Chép"}</button>}
+                        {k && <button type="button" onClick={() => copy(k, value)} className={cp}>{copied === k ? "Đã chép" : "Chép"}</button>}
                       </dd>
                     </div>
                   ))}
                 </dl>
+
                 <p className="mt-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-left text-xs leading-relaxed text-amber-200">
-                  <b>Chuyển đúng đến từng đồng ({fmt(order.amount)}):</b> mỗi đơn có một số tiền riêng (gồm +{order.suffix}đ nhận diện) để hệ thống nhận đúng đơn kể cả khi app ngân hàng làm mất nội dung. Không đóng trang này.
+                  <b>Chuyển đúng từng đồng:</b> mỗi đơn có số tiền riêng (+{order.suffix}đ nhận diện) để hệ thống nhận đúng đơn dù app ngân hàng/MoMo làm mất nội dung. Giữ trang này mở.
                 </p>
-                <button type="button" onClick={reset} className="mt-4 rounded-full bg-white/10 px-6 py-2.5 text-sm font-semibold transition hover:bg-white/20 active:scale-95">{expired ? "Quay lại giỏ" : "Hủy, quay lại giỏ"}</button>
+                {help}
+                <button type="button" onClick={reset} className="mt-3 w-full rounded-full bg-white/10 px-6 py-2.5 text-sm font-semibold transition hover:bg-white/20 active:scale-95">{expired ? "Quay lại giỏ" : "Hủy, quay lại giỏ"}</button>
               </div>
             )}
 
             {/* ---- giỏ hàng ---- */}
             {!order && (
-              <div className="mt-4">
+              <div className="mt-5">
                 {cart.length === 0 ? (
-                  <p className="rounded-2xl bg-white/[0.06] px-4 py-8 text-center text-sm text-haze">Giỏ hàng trống. Vào trang game và bấm &ldquo;Mua key&rdquo; để thêm.</p>
+                  <div className="rounded-3xl border border-dashed border-white/15 px-4 py-10 text-center">
+                    <span className="mx-auto grid size-14 place-items-center rounded-full bg-white/[0.06] text-haze">{cartIcon}</span>
+                    <p className="mt-3 font-semibold">Giỏ hàng đang trống</p>
+                    <p className="mt-1 text-sm text-haze">Vào trang game và bấm &ldquo;Mua key&rdquo; để thêm.</p>
+                  </div>
                 ) : (
                   <ul className="space-y-2">
                     {lines.map(({ slug, p }) => (
-                      <li key={slug} className="flex items-center gap-3 rounded-2xl bg-white/[0.06] p-3">
+                      <li key={slug} className="anim-pop flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-2.5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {thumbIn(slug) ? <img src={thumbIn(slug)} alt="" loading="lazy" className="size-14 shrink-0 rounded-xl object-cover" /> : <span className="size-14 shrink-0 rounded-xl bg-white/10" />}
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{titleOf(slug)}</span>
+                          <span className="block truncate font-semibold">{titleOf(slug)}</span>
                           <span className="block text-xs text-haze">{!p ? (prices.size ? "Ngừng bán key" : "Đang tải giá…") : p.fee > 0 ? `Key ${fmt(p.price)} + phí ${fmt(p.fee)}` : "Key mật khẩu ZIP"}</span>
                         </span>
                         <span className="font-display font-bold tabular-nums">{p ? fmt(p.price + p.fee) : "–"}</span>
-                        <button type="button" onClick={() => removeFromCart(slug)} aria-label={`Xóa ${titleOf(slug)} khỏi giỏ`} className="grid size-8 place-items-center rounded-full bg-white/10 transition hover:bg-white/20">&times;</button>
+                        <button type="button" onClick={() => removeFromCart(slug)} aria-label={`Xóa ${titleOf(slug)} khỏi giỏ`} className="grid size-8 shrink-0 place-items-center rounded-full bg-white/10 transition hover:bg-red-500/30 active:scale-95">&times;</button>
                       </li>
                     ))}
                   </ul>
                 )}
                 {cart.length > 0 && (
-                  <div className="mt-4 flex items-baseline justify-between px-1">
-                    <span className="text-haze">Tạm tính</span>
-                    <span className="font-display text-2xl font-extrabold tabular-nums">{fmt(total)}</span>
+                  <div className="mt-4 rounded-2xl bg-white/[0.04] px-4 py-3">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-haze">Tạm tính</span>
+                      <span className="font-display text-2xl font-extrabold tabular-nums">{fmt(total)}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-haze">Chuyển khoản MB/MoMo, key hiện ngay sau khi nhận tiền (5–30 giây).</p>
                   </div>
                 )}
                 {err && <p role="alert" className="mt-3 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{err}</p>}
                 {cart.length > 0 && (
                   <button type="button" onClick={checkout} disabled={busy || missing || prices.size === 0}
                           className="mt-4 w-full rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
-                    {busy ? "Đang tạo mã QR…" : "Thanh toán"}
+                    {busy ? "Đang tạo mã QR…" : `Thanh toán ${fmt(total)}`}
                   </button>
                 )}
 
@@ -256,12 +315,15 @@ export default function CartButton() {
                     <h3 className="text-sm font-semibold">Key đã mua</h3>
                     <ul className="mt-2 space-y-2">
                       {oldList.flatMap(([code, ks]) => ks.map((k) => (
-                        <li key={code + k.slug} className="flex items-center justify-between gap-3 rounded-2xl bg-white/[0.06] px-4 py-3">
-                          <span className="min-w-0"><span className="block truncate text-sm">{k.title}</span><code className="font-mono text-sm font-bold text-berry">{k.password}</code></span>
+                        <li key={code + k.slug} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-2.5">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          {thumbIn(k.slug) ? <img src={thumbIn(k.slug)} alt="" loading="lazy" className="size-12 shrink-0 rounded-xl object-cover" /> : <span className="size-12 shrink-0 rounded-xl bg-white/10" />}
+                          <span className="min-w-0 flex-1"><span className="block truncate text-sm">{k.title}</span><code className="font-mono text-sm font-bold text-berry">{k.password}</code></span>
                           <button type="button" onClick={() => copy(code + k.slug, k.password)} className={cp}>{copied === code + k.slug ? "Đã chép" : "Chép"}</button>
                         </li>
                       )))}
                     </ul>
+                    {FB && <a href={FB} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-xs text-haze underline decoration-white/20 underline-offset-4 transition hover:text-mist">Không nhận được pass? Nhắn Facebook</a>}
                   </div>
                 )}
               </div>

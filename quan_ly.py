@@ -1383,8 +1383,19 @@ def do_errors():
         msg = " ".join(r["message"].split())[:90]
         print(f"  {when:%d/%m %H:%M}  {'trình duyệt' if r['source'] == 'client' else 'máy chủ':<11} {'đã báo' if r['alerted'] else 'chưa báo':<8} {r['path'] or '-'}\n      {msg}")
 
-# --- [7] key game: giá key, phí, mật khẩu ZIP (bảng Supabase game_keys, có hiệu lực ngay, không cần đẩy Vercel) ---
+# --- [7] key game: giá key, phí, mật khẩu ZIP (bảng Supabase game_keys, có hiệu lực ngay, không cần đẩy Vercel) --- key-ui v2
+_KEY_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+if _KEY_COLOR and os.name == "nt": os.system("")   # bật màu ANSI cho cmd Windows 10+
+
+def _c(code, s): return f"\033[{code}m{s}\033[0m" if _KEY_COLOR else s
 def _vnd(n): return f"{int(n):,}".replace(",", ".") + "đ"
+def _cut(s, n): return s if len(s) <= n else s[:n - 1] + "…"
+def _pad(s, n): return s.ljust(n)
+def _box(lines, color="36"):
+    w = max(len(l) for l in lines) + 2
+    print(_c(color, "  ╭" + "─" * w + "╮"))
+    for l in lines: print(_c(color, "  │") + " " + l.ljust(w - 1) + _c(color, "│"))
+    print(_c(color, "  ╰" + "─" * w + "╯"))
 
 def drop_keys(slugs):
     """Game bị xóa thì xóa luôn key của nó trên Supabase (web cũng tự bỏ qua key của game không còn)."""
@@ -1397,21 +1408,56 @@ def drop_keys(slugs):
 def _key_rows():
     return {r["slug"]: r for r in sb_call("GET", "/rest/v1/game_keys?select=slug,price,fee,password,enabled") or []}
 
+def _key_stats():
+    # Thông báo nhanh: đơn key đã thu / đang chờ. Lỗi mạng thì bỏ qua, không chặn việc sửa giá.
+    try:
+        utc = datetime.timezone.utc
+        now = datetime.datetime.now(utc)
+        since = (now - datetime.timedelta(days=7)).isoformat()
+        paid = sb_call("GET", "/rest/v1/orders?select=amount,paid_at&kind=eq.key&status=eq.paid&paid_at=gte." + quote(since) + "&order=paid_at.desc&limit=1000") or []
+        wait = sb_call("GET", "/rest/v1/orders?select=id&kind=eq.key&status=eq.pending&expires_at=gt." + quote(now.isoformat()) + "&limit=1000") or []
+        def local_day(o):
+            return datetime.datetime.fromisoformat(str(o["paid_at"]).replace("Z", "+00:00")).astimezone().date()
+        today = [o for o in paid if o.get("paid_at") and local_day(o) == datetime.datetime.now().date()]
+        return len(today), sum(o["amount"] for o in today), len(paid), sum(o["amount"] for o in paid), len(wait)
+    except Exception:
+        return None
+
+def _key_state(r):
+    if not r: return "○", "chưa đặt", "90"
+    if not r["enabled"]: return "◌", "đang TẮT", "33"
+    if not r["password"]: return "⚠", "thiếu mật khẩu", "31"
+    if r["price"] + r["fee"] <= 0: return "⚠", "giá = 0", "31"
+    return "●", "đang BÁN", "32"
+
 def _key_show(games, rows):
-    print("\n  Game | giá key | phí | trạng thái | mật khẩu")
+    st = _key_stats()
+    head = [_c("1;36", "KEY GAME") + "  ·  giá + phí + mật khẩu ZIP, có hiệu lực ngay trên web"]
+    if st:
+        head.append(f"Hôm nay: {_c('1;32', str(st[0]) + ' đơn')} / {_c('1;32', _vnd(st[1]))}   ·   7 ngày: {st[2]} đơn / {_vnd(st[3])}   ·   đang chờ thanh toán: {st[4]}")
+    print(); _box(head)
+    print("\n  " + _c("90", f"{'#':>3}  {_pad('Game', 28)} {'Giá':>10} {'Phí':>8} {'Khách trả':>11}  {_pad('Trạng thái', 18)} Mật khẩu"))
+    print("  " + _c("90", "─" * 102))
+    n_ok = n_bad = 0
     for i, g in enumerate(games, 1):
-        r = rows.get(g["slug"])
-        if not r: print(f"  {i:>2}. {g['title']}  [chưa đặt key]"); continue
-        ok = r["enabled"] and r["password"] and r["price"] + r["fee"] > 0
-        state = "BÁN" if ok else ("TẮT" if not r["enabled"] else "CHƯA BÁN (thiếu mật khẩu hoặc giá 0)")
-        print(f"  {i:>2}. {g['title']}  | {_vnd(r['price'])} | {_vnd(r['fee'])} | {state} | {r['password'] or '(trống)'}")
+        r = rows.get(g["slug"]); icon, label, col = _key_state(r)
+        n_ok += icon == "●"; n_bad += icon == "⚠"
+        if r:
+            line = f"{i:>3}  {_pad(_cut(g['title'], 28), 28)} {_vnd(r['price']):>10} {_vnd(r['fee']):>8} {_c('1', _vnd(r['price'] + r['fee']).rjust(11))}  "
+            print("  " + line + _c(col, _pad(f"{icon} {label}", 18)) + " " + (r["password"] or _c("31", "(trống)")))
+        else:
+            print("  " + _c("90", f"{i:>3}  {_pad(_cut(g['title'], 28), 28)} {'–':>10} {'–':>8} {'–':>11}  {_pad(f'{icon} {label}', 18)}"))
+    print("  " + _c("90", "─" * 102))
+    bad_txt = _c("31", f"⚠ {n_bad} cần sửa") if n_bad else _c("90", "⚠ 0 cần sửa")
+    print(f"  {_c('32', f'● {n_ok} đang bán')}   {bad_txt}   {_c('90', f'○ {len(games) - len(rows)} chưa đặt')}")
+    print(_c("90", "  Khách trả = giá key + phí (+ vài đồng lẻ tự sinh để nhận diện đơn).") + "\n")
 
 def _key_int(label, cur):
     while True:
-        s = input(f"  {label} [{cur}] (Enter = giữ): ").strip().replace(".", "").replace(",", "")
+        s = input(f"  {label} [{_vnd(cur)}] (Enter = giữ): ").strip().lower().replace(".", "").replace(",", "").rstrip("đd")
         if not s: return cur
         if s.isdigit() and int(s) <= 5_000_000: return int(s)
-        print("  ! Nhập số nguyên 0-5.000.000.")
+        print(_c("31", "  ✗ Nhập số nguyên từ 0 đến 5.000.000 (vd: 20000 hoặc 20.000)."))
 
 def _key_save(slug, r):
     sb_call("POST", "/rest/v1/game_keys?on_conflict=slug",
@@ -1424,24 +1470,33 @@ def do_keys():
         if not games: print("  Chưa có game nào."); return
         rows = _key_rows()
         _key_show(games, rows)
-        print("\n  Khách trả = giá key + phí (+ vài đồng lẻ tự sinh để nhận diện đơn). Nhiều game cùng lúc thì đặt chung giá/phí.")
         ni = ask_nums("  Số game cần sửa (vd: 1 | 2-4 | all; Enter = xong): ", len(games))
         if not ni: return
         picked = [games[i - 1] for i in ni]
         base = rows.get(picked[0]["slug"], {"price": 0, "fee": 0, "password": "", "enabled": True})
-        print(f"\n  Đang sửa: {', '.join(g['title'] for g in picked)}")
-        price = _key_int("Giá key (đ)", base["price"])
-        fee = _key_int("Phí (đ, cộng thêm vào giá)", base["fee"])
+        print("\n  " + _c("1;36", "Đang sửa: ") + ", ".join(_cut(g["title"], 30) for g in picked))
+        if len(picked) > 1: print(_c("90", "  (nhiều game: giá/phí đặt chung; mật khẩu chỉ hỏi game nào chưa có)"))
+        price = _key_int("Giá key", base["price"])
+        fee = _key_int("Phí    ", base["fee"])
+        if price + fee > 5_000_000: print(_c("33", "  ! Tổng giá + phí vượt 5.000.000đ: web sẽ từ chối tạo đơn. Nhập lại.")); continue
         enabled = base["enabled"]
-        if input(f"  Đang {'BẬT' if enabled else 'TẮT'} bán. Đổi trạng thái? (y/N): ").strip().lower() == "y": enabled = not enabled
+        if input(f"  Đang {_c('32', 'BẬT') if enabled else _c('33', 'TẮT')} bán. Đổi trạng thái? (y/N): ").strip().lower() == "y": enabled = not enabled
+        done = []
         for g in picked:
             r = dict(rows.get(g["slug"], {"password": ""}), price=price, fee=fee, enabled=enabled)
             if len(picked) == 1 or not r["password"]:
-                pw = input(f"  Mật khẩu ZIP của '{g['title']}' [{r['password'] or 'trống'}] (Enter = giữ): ").strip()
+                pw = input(f"  Mật khẩu ZIP của '{_cut(g['title'], 30)}' [{r['password'] or 'trống'}] (Enter = giữ): ").strip()
                 if pw: r["password"] = pw
-            if not r["password"]: print(f"  ! '{g['title']}' chưa có mật khẩu: web CHƯA bán key này cho tới khi bạn đặt.")
-            _key_save(g["slug"], r)
-        print("  ✓ Đã lưu (có hiệu lực ngay trên web).")
+            _key_save(g["slug"], r); done.append((g, r))
+        print()
+        lines = [_c("1;32", f"✓ Đã lưu {len(done)} game") + _c("90", "  (có hiệu lực ngay, không cần đẩy Vercel)")]
+        for g, r in done:
+            icon, label, col = _key_state(r)
+            lines.append(f"{_c(col, icon)} {_cut(g['title'], 26).ljust(26)} {_vnd(r['price'])} + {_vnd(r['fee'])} = {_c('1', _vnd(r['price'] + r['fee']))}  {_c(col, label)}")
+        _box(lines, "32" if all(_key_state(r)[0] == "●" for _, r in done) else "33")
+        bad = [g["title"] for g, r in done if not r["password"]]
+        if bad: print(_c("33", f"  ! Chưa có mật khẩu: {', '.join(_cut(t, 24) for t in bad)}. Web CHƯA bán key này cho tới khi bạn đặt."))
+        input(_c("90", "  Enter để quay lại danh sách… "))
 
 
 # --- menu cmd 7 ---
