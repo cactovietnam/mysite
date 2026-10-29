@@ -25,7 +25,7 @@ export function EmptyArt() {
       <g opacity=".55" transform="translate(8 10) scale(1.5)">
         <path d={PAD} /><path d="M13 12v6M10 15h6" /><circle cx="31" cy="13" r="1.2" /><circle cx="36" cy="17" r="1.2" />
       </g>
-      <circle cx="88" cy="54" r="17" stroke="var(--accent)" fill="rgba(11, 18, 32,0.7)" />
+      <circle cx="88" cy="54" r="17" stroke="var(--accent)" fill="rgba(15,12,26,0.7)" />
       <path d="m100 66 12 12" stroke="var(--accent)" />
       <path d="M82 54h12" stroke="var(--accent)" />
     </svg>

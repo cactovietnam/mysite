@@ -154,7 +154,7 @@ export default function CartPage() {
       <ol aria-label="Các bước" className="mt-8 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider sm:max-w-xl">
         {["Giỏ hàng", "Chuyển khoản", "Nhận key"].map((s, i) => (
           <li key={s} className="flex flex-1 flex-col gap-2">
-            <span className={`h-1.5 rounded-full transition-colors duration-500 ${i <= step ? "bg-gradient-to-r from-[#5eead4] to-[#38bdf8]" : "bg-white/10"}`} />
+            <span className={`h-1.5 rounded-full transition-colors duration-500 ${i <= step ? "bg-gradient-to-r from-[#5eead4] to-[#ee5a96]" : "bg-white/10"}`} />
             <span className={i <= step ? "text-mist" : "text-haze/70"}>{s}</span>
           </li>
         ))}
@@ -193,7 +193,7 @@ export default function CartPage() {
             <p className="text-xs uppercase tracking-wider text-haze">Số tiền chính xác</p>
             <button type="button" onClick={() => copy("amt", String(order.amount))} title="Bấm để chép số tiền"
                     className="mt-2 inline-flex flex-wrap items-center justify-center gap-3 font-display text-5xl font-extrabold tabular-nums tracking-tight transition active:scale-95 sm:text-6xl">
-              <span className="bg-gradient-to-r from-[#5eead4] to-[#38bdf8] bg-clip-text text-transparent">{order.amount.toLocaleString("vi-VN")}đ</span>
+              <span className="bg-gradient-to-r from-[#5eead4] to-[#ee5a96] bg-clip-text text-transparent">{order.amount.toLocaleString("vi-VN")}đ</span>
               <span className="rounded-full bg-white/10 px-3 py-1 font-sans text-xs font-semibold text-mist">{copied === "amt" ? "Đã chép" : "Chép"}</span>
             </button>
             <div className="relative mx-auto mt-6 w-fit rounded-3xl bg-white p-4 shadow-xl shadow-black/40">
@@ -202,7 +202,7 @@ export default function CartPage() {
               {expired && <div className="absolute inset-0 grid place-items-center text-base font-semibold text-neutral-700">Mã đã hết hạn</div>}
             </div>
             <div className="mx-auto mt-6 h-2 w-full max-w-xs overflow-hidden rounded-full bg-white/10" aria-hidden>
-              <div className="h-full rounded-full bg-gradient-to-r from-[#5eead4] to-[#38bdf8] transition-[width] duration-1000 ease-linear" style={{ width: `${Math.min(100, (left / TTL) * 100)}%` }} />
+              <div className="h-full rounded-full bg-gradient-to-r from-[#5eead4] to-[#ee5a96] transition-[width] duration-1000 ease-linear" style={{ width: `${Math.min(100, (left / TTL) * 100)}%` }} />
             </div>
             <p role="status" aria-live="polite" className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm text-haze">
               {expired ? "Đơn hết hạn. Nếu đã chuyển tiền, hệ thống vẫn ghi nhận." :

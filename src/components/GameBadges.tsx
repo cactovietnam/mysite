@@ -5,7 +5,7 @@ export function PatchChip({ patch }: { patch: PatchBadge }) {
   return (
     <span className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold text-white"
           style={{
-            background: `linear-gradient(90deg, ${patch.from}59, ${patch.to}59), rgba(11, 18, 32,0.74)`,
+            background: `linear-gradient(90deg, ${patch.from}59, ${patch.to}59), rgba(15,12,26,0.74)`,
             borderColor: `${patch.from}99`,
           }}>
       {patch.label}

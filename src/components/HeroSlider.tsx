@@ -56,7 +56,7 @@ export default function HeroSlider({ games }: { games: SlideData[] }) {
       }}
     >
       <div
-        className="relative isolate h-[520px] overflow-hidden rounded-[2.5rem] border border-[#38bdf8]/25 bg-plum md:h-[560px]"
+        className="relative isolate h-[520px] overflow-hidden rounded-[2.5rem] border border-[#8b5cf6]/25 bg-plum md:h-[560px]"
         onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
         onTouchEnd={(e) => {
           if (touchX.current === null || !multi) return;
@@ -88,7 +88,7 @@ export default function HeroSlider({ games }: { games: SlideData[] }) {
                   )}
                 </div>
                 <div aria-hidden className="absolute inset-0"
-                     style={{ background: "radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%), linear-gradient(0deg, #0b1220 3%, rgba(11, 18, 32,0.82) 36%, rgba(11, 18, 32,0.2) 72%, rgba(11, 18, 32,0.35) 100%)" }} />
+                     style={{ background: "radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%), linear-gradient(0deg, #0f0c1a 3%, rgba(15,12,26,0.82) 36%, rgba(15,12,26,0.2) 72%, rgba(15,12,26,0.35) 100%)" }} />
 
                 <div className="relative flex h-full flex-col items-center justify-end px-5 pb-20 text-center sm:px-20 sm:pb-16">
                   <p className="glass inline-flex items-center gap-2.5 rounded-full px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.16em]">

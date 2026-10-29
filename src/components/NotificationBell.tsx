@@ -45,7 +45,7 @@ export default function NotificationBell({ notice, items }: { notice: string; it
         <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M6 9a6 6 0 1 1 12 0c0 6 2 7.5 2 7.5H4S6 15 6 9ZM10 20a2 2 0 0 0 4 0" />
         </svg>
-        {seen !== stamp && <span aria-label="Có thông báo mới" className="absolute right-2 top-2 size-2.5 rounded-full bg-berry ring-2 ring-[#0e1626]" />}
+        {seen !== stamp && <span aria-label="Có thông báo mới" className="absolute right-2 top-2 size-2.5 rounded-full bg-berry ring-2 ring-[#100c20]" />}
       </button>
 
       {open && (

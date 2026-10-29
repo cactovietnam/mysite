@@ -6,7 +6,7 @@ import { donateConfig, donateNavLabel } from "@/data/donate";
 import { softNav } from "@/lib/soft-nav";
 
 const tab =
-  "relative flex h-14 shrink-0 items-center gap-1.5 px-3 text-sm font-medium transition-colors after:absolute after:inset-x-3 after:bottom-2 after:h-[2.5px] after:origin-center after:rounded-full after:bg-gradient-to-r after:from-[#5eead4] after:to-[#38bdf8] after:transition-transform after:duration-300";
+  "relative flex h-14 shrink-0 items-center gap-1.5 px-3 text-sm font-medium transition-colors after:absolute after:inset-x-3 after:bottom-2 after:h-[2.5px] after:origin-center after:rounded-full after:bg-gradient-to-r after:from-[#5eead4] after:to-[#ee5a96] after:transition-transform after:duration-300";
 const idle = "text-slate-400 after:scale-x-0 hover:text-mist hover:after:scale-x-100";
 const active = "text-mist after:scale-x-100";
 // Tab Donate: chữ + icon màu berry, gạch chân sáng lên khi đang ở /donate hoặc rê chuột.

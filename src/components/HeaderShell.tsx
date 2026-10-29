@@ -89,7 +89,7 @@ export default function HeaderShell({ brand, brandBig, nav, tools }: Props) {
               transform: "translate3d(0, calc((1 - var(--hp)) * 10px), 0) scaleX(calc(0.9 + 0.1 * var(--hp)))",
             }}
           >
-            <div className="edge h-full rounded-[28px] bg-[#0e1626] shadow-lg shadow-black/40" />
+            <div className="edge h-full rounded-[28px] bg-[#100c20] shadow-lg shadow-black/40" />
           </div>
 
           {/* Vạch gradient dưới menu: ở đầu trang dài hết hàng menu, cuộn xuống thì co về giữa rồi biến mất */}
