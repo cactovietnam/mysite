@@ -76,11 +76,11 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           <div className="absolute inset-0"
                style={{ background: "radial-gradient(55% 70% at 85% 15%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%)" }} />
           <div className="absolute inset-0 hidden md:block"
-               style={{ background: "linear-gradient(90deg, #0f0c1a 0%, rgba(15,12,26,0.9) 24%, rgba(15,12,26,0.5) 46%, rgba(15,12,26,0) 72%)" }} />
+               style={{ background: "linear-gradient(90deg, #0b1220 0%, rgba(11, 18, 32,0.9) 24%, rgba(11, 18, 32,0.5) 46%, rgba(11, 18, 32,0) 72%)" }} />
           <div className="absolute inset-0 md:hidden"
-               style={{ background: "linear-gradient(180deg, rgba(15,12,26,0.45) 0%, rgba(15,12,26,0) 24%, rgba(15,12,26,0.85) 62%, #0f0c1a 100%)" }} />
+               style={{ background: "linear-gradient(180deg, rgba(11, 18, 32,0.45) 0%, rgba(11, 18, 32,0) 24%, rgba(11, 18, 32,0.85) 62%, #0b1220 100%)" }} />
           <div className="absolute inset-0"
-               style={{ background: "linear-gradient(0deg, #0f0c1a 0%, rgba(15,12,26,0) 20%), linear-gradient(180deg, rgba(15,12,26,0.75) 0%, rgba(15,12,26,0) 34%)" }} />
+               style={{ background: "linear-gradient(0deg, #0b1220 0%, rgba(11, 18, 32,0) 20%), linear-gradient(180deg, rgba(11, 18, 32,0.75) 0%, rgba(11, 18, 32,0) 34%)" }} />
         </div>
 
         <div className="mx-auto w-full max-w-6xl px-4 pb-12 pt-32 md:pt-48">

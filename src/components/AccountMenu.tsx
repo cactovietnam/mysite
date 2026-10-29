@@ -42,15 +42,15 @@ export default function AccountMenu() {
       {user ? (
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label={`Tài khoản ${name}`}
                 className="flex h-9 items-center gap-2 rounded-full bg-white/10 pl-1 pr-1 text-sm transition hover:bg-white/[0.16] sm:h-10 sm:pl-1.5 sm:pr-4">
-          <span aria-hidden className="grid size-7 place-items-center rounded-full bg-gradient-to-br from-berry to-[#7c5cff] text-xs font-bold uppercase text-ink">
+          <span aria-hidden className="grid size-7 place-items-center rounded-full bg-gradient-to-br from-berry to-[#3b82f6] text-xs font-bold uppercase text-ink">
             {name.slice(0, 1)}
           </span>
           <span className="hidden max-w-[8rem] truncate sm:inline">{name}</span>
         </button>
       ) : (
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label="Menu tài khoản"
-                className="grid size-9 place-items-center rounded-full bg-[linear-gradient(135deg,#5eead4,#a78bfa)] p-[2px] transition active:scale-95 sm:size-10">
-          <span className="grid size-full place-items-center rounded-full bg-[#14102b]"><svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                className="grid size-9 place-items-center rounded-full bg-[linear-gradient(135deg,#5eead4,#38bdf8)] p-[2px] transition active:scale-95 sm:size-10">
+          <span className="grid size-full place-items-center rounded-full bg-[#101a2c]"><svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
             {open ? <path d="m5 5 10 10M15 5 5 15" /> : <><circle cx="10" cy="7" r="3.2" /><path d="M3.5 17c.8-3.3 3.3-5 6.5-5s5.7 1.7 6.5 5" /></>}
           </svg></span>
         </button>
@@ -66,7 +66,7 @@ export default function AccountMenu() {
                 <Link key={k} href={`/?list=${k}#kho-game`} role="menuitem"
                       onClick={(e) => { setOpen(false); softNav(e, pathname, `?list=${k}`, "library"); }}
                       className={itemRow}>
-                  {label}<span className={num}>{n}</span>
+                  <span className="flex items-center gap-2"><span aria-hidden className={k === "fav" ? "text-red-500" : "text-sky-400"}>{k === "fav" ? "♥" : "●"}</span>{label}</span><span className={num}>{n}</span>
                 </Link>
               ))}
               <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>
@@ -87,7 +87,7 @@ export default function AccountMenu() {
                 <Link key={k} href={`/?list=${k}#kho-game`} role="menuitem"
                       onClick={(e) => { setOpen(false); softNav(e, pathname, `?list=${k}`, "library"); }}
                       className={itemRow}>
-                  {label}<span className={num}>{n}</span>
+                  <span className="flex items-center gap-2"><span aria-hidden className={k === "fav" ? "text-red-500" : "text-sky-400"}>{k === "fav" ? "♥" : "●"}</span>{label}</span><span className={num}>{n}</span>
                 </Link>
               ))}
               <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>

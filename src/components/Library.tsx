@@ -74,7 +74,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
   // Mỗi chip một màu riêng: engine lấy màu engine (site.json), Yêu thích = hồng san hô, Đã xem = xanh trời, Tất cả = tím -> hồng đậm.
   // Chưa chọn: nền + viền nhạt pha màu, chữ sáng, số theo màu. Đã chọn: đặc màu + glow, chữ tự chọn sáng/tối theo độ tương phản.
   const tone = (c: string, on: boolean): React.CSSProperties => {
-    if (!on) return { background: `${c}1a`, borderColor: `${c}4d`, color: "#efeaff" };
+    if (!on) return { background: `${c}1a`, borderColor: `${c}4d`, color: "#eaf1fb" };
     const fg = onColor(c);
     return { background: c, borderColor: c, color: fg, boxShadow: `0 8px 24px -8px ${c}, 0 0 0 1px ${c}` };
   };
@@ -85,13 +85,13 @@ export default function Library({ games }: { games: GameCardData[] }) {
     if (id === "all") {
       return (
         <button key={id} onClick={() => swap(() => update({ engine: null }))} aria-pressed={on}
-                className={`${base} ${on ? "border-transparent bg-gradient-to-r from-[#7c3aed] to-[#7c6cff] text-white shadow-[0_8px_24px_-8px_#7c6cff]" : "border-[#a78bfa]/30 bg-[#a78bfa]/10 text-mist hover:bg-[#a78bfa]/20"}`}>
-          {label} <span className={on ? "text-white/70" : "text-[#c4b5fd]"}>{count}</span>
+                className={`${base} ${on ? "border-transparent bg-gradient-to-r from-[#2563eb] to-[#3b82f6] text-white shadow-[0_8px_24px_-8px_#3b82f6]" : "border-[#38bdf8]/30 bg-[#38bdf8]/10 text-mist hover:bg-[#38bdf8]/20"}`}>
+          {label} <span className={on ? "text-white/70" : "text-[#bae6fd]"}>{count}</span>
         </button>
       );
     }
     const raw = engineColor(id);
-    const c = isHex(raw) ? raw : "#a78bfa";
+    const c = isHex(raw) ? raw : "#38bdf8";
     return (
       <button key={id} onClick={() => swap(() => update({ engine: id }))} aria-pressed={on} style={tone(c, on)}
               className={`${base} ${on ? "" : "hover:brightness-125"}`}>
@@ -120,7 +120,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
           <div className="flex flex-wrap gap-2.5">
             {chip("all", "Tất cả", games.length)}
             {engines.map((e) => chip(e, e, games.filter((g) => g.engine === e).length))}
-            {([["fav", "Yêu thích", alive(fav), "#fb7185"], ["seen", "Đã xem", alive(seen), "#38bdf8"]] as const).filter(([k]) => filters.list === k).map(([k, label, n, c]) => {
+            {([["fav", "Yêu thích", alive(fav), "#ef4444"], ["seen", "Đã xem", alive(seen), "#38bdf8"]] as const).filter(([k]) => filters.list === k).map(([k, label, n, c]) => {
               const on = filters.list === k;
               return (
                 <button key={k} onClick={() => swap(() => update({ list: on ? "all" : k }))} aria-pressed={on} style={tone(c, on)}

@@ -25,13 +25,13 @@ export default function QuickAccess({ games }: { games: GameCardData[] }) {
   const latest = games.reduce((m, g) => (g.updatedAt > m ? g.updatedAt : m), "");
 
   const tiles: Tile[] = [
-    { id: "all", label: "Tất cả game", count: games.length, dot: "#ff6b98", search: "" },
+    { id: "all", label: "Tất cả game", count: games.length, dot: "#38bdf8", search: "" },
     ...engines.map((e) => ({
       id: `e-${e}`, label: e, count: games.filter((g) => g.engine === e).length,
       dot: engineColor(e), search: `?engine=${encodeURIComponent(e)}`,
     })),
     ...(vh > 0 ? [{ id: "vh", label: "Việt hóa", count: vh, dot: "#2dd4bf", search: `?tag=${encodeURIComponent("Việt hóa")}` }] : []),
-    ...(favCount > 0 ? [{ id: "fav", label: "Yêu thích của bạn", count: favCount, dot: "#ff6b98", search: "?list=fav" }] : []),
+    ...(favCount > 0 ? [{ id: "fav", label: "Yêu thích của bạn", count: favCount, dot: "#ef4444", search: "?list=fav" }] : []),
     ...(cheat > 0 ? [{ id: "cheat", label: "Có Cheat", count: cheat, dot: "#fbbf24", search: "?tag=Cheat" }] : []),
   ];
   const hasDiscord = /^https?:\/\//i.test(site.discord);

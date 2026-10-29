@@ -30,7 +30,7 @@ export default function HowTo() {
       {(hasDiscord || hasFacebook) && (
         <div className="glass relative mt-4 flex flex-col items-start justify-between gap-5 overflow-hidden rounded-[2rem] p-7 sm:flex-row sm:items-center sm:p-8">
           <div aria-hidden className="pointer-events-none absolute inset-0"
-               style={{ background: "radial-gradient(50% 120% at 100% 50%, rgba(124,92,255,0.28), transparent 70%), radial-gradient(40% 100% at 0% 0%, rgba(167, 139, 250,0.16), transparent 70%)" }} />
+               style={{ background: "radial-gradient(50% 120% at 100% 50%, rgba(59, 130, 246,0.28), transparent 70%), radial-gradient(40% 100% at 0% 0%, rgba(56, 189, 248,0.16), transparent 70%)" }} />
           <div className="relative">
             <h3 className="font-display text-2xl font-bold tracking-tight">Cần hỗ trợ hoặc báo link lỗi?</h3>
             <p className="mt-1.5 text-haze">Nhắn qua {channels} để hỏi nhanh{hasDiscord ? " và nhận thông báo khi có game mới" : ""}.</p>

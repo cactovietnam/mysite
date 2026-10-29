@@ -8,12 +8,12 @@ export const isHex = (v: unknown): v is string => typeof v === "string" && /^#[0
 const ENGINE_COLOR: Record<string, string> = site.engines; // sửa/thêm màu trong src/data/site.json
 const ENGINE_ALIAS: Record<string, string> = { "RPG Maker": "RPGM", RPGMaker: "RPGM", "Ren'py": "Ren'Py", Renpy: "Ren'Py" };
 
-export const engineColor = (engine: string) => ENGINE_COLOR[engine] ?? ENGINE_COLOR[ENGINE_ALIAS[engine] ?? ""] ?? "#a78bfa";
+export const engineColor = (engine: string) => ENGINE_COLOR[engine] ?? ENGINE_COLOR[ENGINE_ALIAS[engine] ?? ""] ?? "#38bdf8";
 
 // ---------- màu nhấn theo game ----------
-export const FALLBACK_ACCENT = "#a78bfa";
-const FALLBACK_ACCENT2 = "#7c6cff";
-const DARK = "#0f0c1a";
+export const FALLBACK_ACCENT = "#38bdf8";
+const FALLBACK_ACCENT2 = "#3b82f6";
+const DARK = "#0b1220";
 
 const lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
 const luminance = (hex: string) => {
@@ -65,5 +65,5 @@ export function providerOf(url: string) {
   let host = "";
   try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* link sai định dạng */ }
   const hit = PROVIDERS.find(([re]) => re.test(host));
-  return { name: hit ? hit[1] : host || "Liên kết", color: hit ? hit[2] : "#a59dc9", host };
+  return { name: hit ? hit[1] : host || "Liên kết", color: hit ? hit[2] : "#9fb0c8", host };
 }

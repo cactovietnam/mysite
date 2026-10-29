@@ -19,8 +19,8 @@ const field =
 // Chip tag: tô nhạt theo nhóm (đồ họa, lối chơi, bối cảnh...); đã chọn thì đặc màu + glow
 const chipStyle = (c: string, on: boolean): React.CSSProperties =>
   on
-    ? { background: c, borderColor: c, color: "#0f0c1a", boxShadow: `0 0 16px -2px ${c}` }
-    : { background: `${c}1f`, borderColor: `${c}47`, color: "#efeaff" };
+    ? { background: c, borderColor: c, color: "#0b1220", boxShadow: `0 0 16px -2px ${c}` }
+    : { background: `${c}1f`, borderColor: `${c}47`, color: "#eaf1fb" };
 
 export default function FilterPanel({ filters, tagIndex, dirty, onChange, onClear, className = "" }: Props) {
   const uid = useId();

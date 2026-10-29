@@ -5,7 +5,7 @@
 const num =
   "grid size-10 place-items-center rounded-xl border text-sm font-semibold tabular-nums transition duration-300";
 const arrow =
-  "grid size-10 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-mist transition duration-300 hover:-translate-y-0.5 hover:border-[#a78bfa]/50 hover:bg-[#a78bfa]/15 active:scale-95 disabled:pointer-events-none disabled:opacity-30";
+  "grid size-10 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-mist transition duration-300 hover:-translate-y-0.5 hover:border-[#38bdf8]/50 hover:bg-[#38bdf8]/15 active:scale-95 disabled:pointer-events-none disabled:opacity-30";
 
 export default function Pagination({ page, pages, total, size, onPage }: {
   page: number; pages: number; total: number; size: number; onPage: (p: number) => void;
@@ -26,8 +26,8 @@ export default function Pagination({ page, pages, total, size, onPage }: {
             <li key={p}>
               <button type="button" onClick={() => onPage(p)} aria-label={`Trang ${p}`} aria-current={on ? "page" : undefined}
                       className={`${num} ${on
-                        ? "border-transparent bg-gradient-to-br from-[#7c3aed] to-[#7c6cff] text-white shadow-[0_8px_24px_-8px_#7c6cff]"
-                        : "border-white/10 bg-white/[0.04] text-mist/80 hover:-translate-y-0.5 hover:border-[#a78bfa]/50 hover:bg-[#a78bfa]/15 hover:text-mist active:scale-95"}`}>
+                        ? "border-transparent bg-gradient-to-br from-[#2563eb] to-[#3b82f6] text-white shadow-[0_8px_24px_-8px_#3b82f6]"
+                        : "border-white/10 bg-white/[0.04] text-mist/80 hover:-translate-y-0.5 hover:border-[#38bdf8]/50 hover:bg-[#38bdf8]/15 hover:text-mist active:scale-95"}`}>
                 {p}
               </button>
             </li>

@@ -14,14 +14,14 @@ export default function FavoriteButton({ slug, variant = "card" }: { slug: strin
   if (variant === "pill") {
     return (
       <button type="button" onClick={() => toggleFav(slug)} aria-pressed={on}
-              className={`glass inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15 active:scale-95 ${on ? "text-berry" : ""}`}>
+              className={`glass inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15 active:scale-95 ${on ? "text-red-500" : ""}`}>
         {heart}{on ? "Đã yêu thích" : "Yêu thích"}
       </button>
     );
   }
   return (
     <button type="button" onClick={() => toggleFav(slug)} aria-pressed={on} aria-label={label} title={label}
-            className={`glass grid size-9 place-items-center rounded-full transition active:scale-90 hover:bg-white/20 ${on ? "text-berry" : "text-white"}`}>
+            className={`glass grid size-9 place-items-center rounded-full transition active:scale-90 hover:bg-white/20 ${on ? "text-red-500" : "text-white"}`}>
       {heart}
     </button>
   );

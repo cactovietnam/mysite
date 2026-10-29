@@ -20,7 +20,7 @@ export default function Cover({ src, title, engine, className = "", priority, de
     return (
       <div
         className={`grid place-items-center ${className}`}
-        style={{ background: `linear-gradient(145deg, ${c}66, #1a1530 75%)` }}
+        style={{ background: `linear-gradient(145deg, ${c}66, #131c2e 75%)` }}
       >
         {!decorative && (
           <span className="font-display text-6xl font-bold text-white/60">{title.slice(0, 1)}</span>

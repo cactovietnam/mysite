@@ -8,7 +8,7 @@ export type TagGroup = { id: string; label: string; color: string; tags: string[
 
 export const TAG_GROUPS: TagGroup[] = data.groups;
 
-const DEFAULT_TONE = "#a59dc9";
+const DEFAULT_TONE = "#9fb0c8";
 const TONE_BY_KEY = new Map(TAG_GROUPS.flatMap((g) => g.tags.map((t) => [fold(t), g.color] as const)));
 
 // key = TagInfo.key (đã fold)
