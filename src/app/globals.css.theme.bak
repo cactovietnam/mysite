@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+/* Nới khung nội dung: header, slider, kho game, footer... đều dùng max-w-6xl */
+@theme {
+  --container-6xl: 90rem; /* 1440px; muốn rộng hơn thì 100rem */
+}
+
+@theme inline {
+  --color-ink: #0f0c1a;
+  --color-plum: #1a1530;
+  --color-haze: #94a3b8;
+  --color-mist: #efeaff;
+  --color-berry: #ff2e93;
+  --color-neon: #2af5d6;
+  /* màu nhấn theo từng game: đặt --accent/--accent2/--on-accent trên khối bọc (xem accentStyle trong game-ui.ts) */
+  --color-accent: var(--accent);
+  --color-accent2: var(--accent2);
+  --color-on-accent: var(--on-accent);
+  --font-display: var(--font-bricolage), system-ui, sans-serif;
+  --font-sans: var(--font-bevn), system-ui, sans-serif;
+}
+
+/* Giữ chỗ thanh cuộn: mở hộp thoại (khóa cuộn) không làm cả trang giật sang phải */
+html { scrollbar-gutter: stable; }
+:root { color-scheme: dark; --accent: #ff2e93; --accent2: #b537f2; --on-accent: #0f0c1a; }
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-mist);
+}
+
+/* Lưới kỹ thuật số mờ ở đầu trang, phía sau header */
+html::before {
+  content: ""; position: fixed; inset: 0 0 auto 0; height: 100vh; height: 100lvh; z-index: -1; pointer-events: none;
+  background-image:
+    radial-gradient(ellipse 50% 80% at 50% 40%, rgba(124, 22, 78, 0.22), transparent),
+    linear-gradient(rgba(139, 92, 246, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.07) 1px, transparent 1px);
+  background-size: 100% 100%, 36px 36px, 36px 36px;
+  -webkit-mask-image: linear-gradient(#000 30%, transparent 90%);
+  mask-image: linear-gradient(#000 30%, transparent 90%);
+}
+
+/* Nền phát sáng: lớp fixed riêng (nhẹ hơn nhiều so với background-attachment: fixed, nhất là trên điện thoại) */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image:
+    radial-gradient(60rem 38rem at 88% -8%, rgba(255, 46, 147, 0.13), transparent 62%),
+    radial-gradient(52rem 40rem at -8% 6%, rgba(181, 55, 242, 0.16), transparent 62%),
+    radial-gradient(46rem 34rem at 52% 108%, rgba(42, 245, 214, 0.07), transparent 62%);
+}
+
+::selection { background: var(--color-berry); color: var(--color-ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* Kính: nền đặc vừa phải, KHÔNG dùng backdrop-filter. Làm mờ nền thật phải tính lại mỗi khung hình khi cuộn/có chuyển động
+   phía sau (slider, header, bộ lọc dính), đó là nguyên nhân chính gây giật. Nền tối nên mắt gần như không thấy khác biệt. */
+.glass {
+  background: rgba(30, 27, 46, 0.84);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+/* Viền gradient 1px quanh header: tách khỏi nền mà không cần thêm blur */
+.edge { position: relative; }
+.edge::before {
+  content: ""; position: absolute; inset: 0; padding: 1px; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(115deg, rgba(255,255,255,0.28), rgba(255,255,255,0.04) 35%, rgba(124,92,255,0.38) 70%, rgba(255,107,152,0.5));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+
+/* Huy hiệu nhỏ (tag): không bao giờ làm mờ nền, vì có thể có hàng chục cái */
+.chip {
+  background: rgba(30, 27, 46, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+/* Hiệu ứng mở trang (chỉ ở khối Hero) và hiệu ứng bật popup */
+@keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+@keyframes pop  { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.anim-rise { animation: rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0ms); }
+.anim-pop  { animation: pop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0ms); }
+.anim-fade { animation: fade 0.2s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Popup tải xuống đang mở: đưa header lên trên lớp phủ (z-50) để không bị tối/mờ (vẫn dưới cổng 18+ z-[60]).
+   Dải trong suốt hai bên pill không chặn chuột, nên bấm ra ngoài popup vẫn đóng được. */
+html[data-dl-open] #site-header { z-index: 55; pointer-events: none; }
+html[data-dl-open] #site-header > * { pointer-events: auto; }
+
+/* Tiêu đề mục: thanh gradient neon phía trước, cùng ngôn ngữ với header */
+.neon-title { display: flex; align-items: center; gap: 0.75rem; }
+.neon-title::before {
+  content: ""; flex: none; width: 4px; height: 1.1em; border-radius: 9999px;
+  background: linear-gradient(180deg, #2af5d6, #ff2e93); box-shadow: 0 0 12px rgba(42, 245, 214, 0.5);
+}
+
+/* ---------- Hiệu ứng chuyển (chỉ opacity + transform: chạy trên GPU, không bắt trình duyệt tính lại bố cục) ---------- */
+/* Hộp thoại đóng: mờ dần + lún xuống thay vì biến mất cái rụp */
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes pop-out  { to { opacity: 0; transform: translateY(8px) scale(0.97); } }
+.anim-out-fade { animation: fade-out 0.16s ease both; pointer-events: none; }
+.anim-out-pop  { animation: pop-out 0.16s cubic-bezier(0.4, 0, 1, 1) both; }
+
+/* Rời trang: nội dung (không gồm header/footer) mờ đi và trượt nhẹ lên (PageTransition.tsx gắn data-leaving) */
+#page { transition: opacity 0.15s ease, transform 0.15s ease; }
+#page[data-leaving] { opacity: 0; transform: translate3d(0, -8px, 0); pointer-events: none; }
+/* Vào trang mới: hiện dần + trượt nhẹ từ dưới lên. Chỉ chạy sau khi người dùng đã chuyển trang (html[data-nav]), lần tải đầu không bị trễ. */
+@keyframes page-in { from { opacity: 0; transform: translate3d(0, 12px, 0); } to { opacity: 1; transform: none; } }
+html[data-nav] .anim-page { animation: page-in 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }

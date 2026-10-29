@@ -11,8 +11,8 @@ const ENGINE_ALIAS: Record<string, string> = { "RPG Maker": "RPGM", RPGMaker: "R
 export const engineColor = (engine: string) => ENGINE_COLOR[engine] ?? ENGINE_COLOR[ENGINE_ALIAS[engine] ?? ""] ?? "#a78bfa";
 
 // ---------- màu nhấn theo game ----------
-export const FALLBACK_ACCENT = "#ff2e93";
-const FALLBACK_ACCENT2 = "#b537f2";
+export const FALLBACK_ACCENT = "#a78bfa";
+const FALLBACK_ACCENT2 = "#7c6cff";
 const DARK = "#0f0c1a";
 
 const lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };

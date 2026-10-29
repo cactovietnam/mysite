@@ -25,7 +25,7 @@ export default function GameCard({ game }: { game: GameCardData }) {
       <span aria-hidden className="pointer-events-none absolute inset-x-2 top-2 aspect-video rounded-[1.5rem] opacity-0 shadow-[0_28px_56px_-20px_var(--c)] transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100"
             style={{ "--c": glow } as React.CSSProperties} />
       {/* ảnh mờ làm nền: hiện ngay trong lúc ảnh thật còn đang tải */}
-      <div className="relative aspect-video overflow-hidden rounded-[1.5rem] bg-plum bg-cover ring-1 ring-[#8b5cf6]/25 transition-shadow duration-500 group-hover:ring-[#2af5d6]/60"
+      <div className="relative aspect-video overflow-hidden rounded-[1.5rem] bg-plum bg-cover ring-1 ring-[#8b5cf6]/25 transition-shadow duration-500 group-hover:ring-[#5eead4]/60"
            style={frame}>
         <Cover src={thumbOf(game)} title={game.title} engine={game.engine}
                className="h-full w-full transform-gpu object-cover transition-transform duration-700 ease-out group-hover:scale-105" />

@@ -6,7 +6,7 @@ import { donateConfig, donateNavLabel } from "@/data/donate";
 import { softNav } from "@/lib/soft-nav";
 
 const tab =
-  "relative flex h-14 shrink-0 items-center gap-1.5 px-3 text-sm font-medium transition-colors after:absolute after:inset-x-3 after:bottom-2 after:h-[2.5px] after:origin-center after:rounded-full after:bg-gradient-to-r after:from-[#2af5d6] after:to-[#ff2e93] after:transition-transform after:duration-300";
+  "relative flex h-14 shrink-0 items-center gap-1.5 px-3 text-sm font-medium transition-colors after:absolute after:inset-x-3 after:bottom-2 after:h-[2.5px] after:origin-center after:rounded-full after:bg-gradient-to-r after:from-[#5eead4] after:to-[#a78bfa] after:transition-transform after:duration-300";
 const idle = "text-slate-400 after:scale-x-0 hover:text-mist hover:after:scale-x-100";
 const active = "text-mist after:scale-x-100";
 // Tab Donate: chữ + icon màu berry, gạch chân sáng lên khi đang ở /donate hoặc rê chuột.
@@ -31,7 +31,7 @@ export default function NavLinks({ engines }: { engines: string[] }) {
     <nav aria-label="Chính" className="hidden min-w-0 flex-1 justify-center overflow-x-auto [scrollbar-width:none] md:flex">
       <Link href="/" aria-current={home ? "page" : undefined} onClick={(e) => softNav(e, pathname, "", "top")}
             className={`${tab} ${home ? active : idle}`}>
-        <span className={home ? "text-[#2af5d6]" : ""}><Ico d={COMPASS} /></span>{site.nav.explore}
+        <span className={home ? "text-[#5eead4]" : ""}><Ico d={COMPASS} /></span>{site.nav.explore}
       </Link>
       <Link href="/#kho-game" onClick={(e) => softNav(e, pathname, "", "library")} className={`${tab} ${idle}`}>
         <Ico d={PAD} />{site.home.libraryTitle}

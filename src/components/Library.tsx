@@ -85,7 +85,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
     if (id === "all") {
       return (
         <button key={id} onClick={() => swap(() => update({ engine: null }))} aria-pressed={on}
-                className={`${base} ${on ? "border-transparent bg-gradient-to-r from-[#7c3aed] to-[#db2777] text-white shadow-[0_8px_24px_-8px_#db2777]" : "border-[#a78bfa]/30 bg-[#a78bfa]/10 text-mist hover:bg-[#a78bfa]/20"}`}>
+                className={`${base} ${on ? "border-transparent bg-gradient-to-r from-[#7c3aed] to-[#7c6cff] text-white shadow-[0_8px_24px_-8px_#7c6cff]" : "border-[#a78bfa]/30 bg-[#a78bfa]/10 text-mist hover:bg-[#a78bfa]/20"}`}>
           {label} <span className={on ? "text-white/70" : "text-[#c4b5fd]"}>{count}</span>
         </button>
       );

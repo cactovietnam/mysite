@@ -30,7 +30,7 @@ export default function HowTo() {
       {(hasDiscord || hasFacebook) && (
         <div className="glass relative mt-4 flex flex-col items-start justify-between gap-5 overflow-hidden rounded-[2rem] p-7 sm:flex-row sm:items-center sm:p-8">
           <div aria-hidden className="pointer-events-none absolute inset-0"
-               style={{ background: "radial-gradient(50% 120% at 100% 50%, rgba(124,92,255,0.28), transparent 70%), radial-gradient(40% 100% at 0% 0%, rgba(255,107,152,0.16), transparent 70%)" }} />
+               style={{ background: "radial-gradient(50% 120% at 100% 50%, rgba(124,92,255,0.28), transparent 70%), radial-gradient(40% 100% at 0% 0%, rgba(167, 139, 250,0.16), transparent 70%)" }} />
           <div className="relative">
             <h3 className="font-display text-2xl font-bold tracking-tight">Cần hỗ trợ hoặc báo link lỗi?</h3>
             <p className="mt-1.5 text-haze">Nhắn qua {channels} để hỏi nhanh{hasDiscord ? " và nhận thông báo khi có game mới" : ""}.</p>
@@ -38,7 +38,7 @@ export default function HowTo() {
           <div className="relative flex shrink-0 flex-wrap gap-3">
             {hasDiscord && (
               <a href={site.discord} target="_blank" rel="noopener noreferrer"
-                 className="rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition duration-300 hover:-translate-y-0.5 active:scale-95">
+                 className="rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-md shadow-black/30 transition duration-300 hover:-translate-y-0.5 active:scale-95">
                 {site.nav.discord}
               </a>
             )}

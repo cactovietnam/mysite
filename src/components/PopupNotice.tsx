@@ -26,7 +26,7 @@ export default function PopupNotice() {
         <h2 id="popup-title" className="font-display text-2xl font-extrabold tracking-tight text-balance">{title}</h2>
         <p className="mt-4 whitespace-pre-line text-left leading-relaxed text-mist/85">{text}</p>
         <button type="button" data-autofocus onClick={() => setClosed(true)}
-                className="mt-6 w-full rounded-full bg-berry px-7 py-3 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition hover:-translate-y-0.5 active:scale-95">
+                className="mt-6 w-full rounded-full bg-berry px-7 py-3 font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95">
           Đã hiểu
         </button>
       </div>

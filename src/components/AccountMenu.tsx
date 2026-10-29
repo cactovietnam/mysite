@@ -49,7 +49,7 @@ export default function AccountMenu() {
         </button>
       ) : (
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label="Menu tài khoản"
-                className="grid size-9 place-items-center rounded-full bg-[linear-gradient(135deg,#2af5d6,#ff2e93)] p-[2px] transition active:scale-95 sm:size-10">
+                className="grid size-9 place-items-center rounded-full bg-[linear-gradient(135deg,#5eead4,#a78bfa)] p-[2px] transition active:scale-95 sm:size-10">
           <span className="grid size-full place-items-center rounded-full bg-[#14102b]"><svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
             {open ? <path d="m5 5 10 10M15 5 5 15" /> : <><circle cx="10" cy="7" r="3.2" /><path d="M3.5 17c.8-3.3 3.3-5 6.5-5s5.7 1.7 6.5 5" /></>}
           </svg></span>

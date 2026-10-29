@@ -106,7 +106,7 @@ export default function PayDonate() {
 
         {err && <p role="alert" className="mt-4 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{err}</p>}
         <button type="button" onClick={create} disabled={busy}
-                className="mt-5 w-full rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
+                className="mt-5 w-full rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
           {busy ? "Đang tạo mã QR…" : "Tạo mã QR"}
         </button>
       </section>

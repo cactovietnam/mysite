@@ -26,7 +26,7 @@ export default function Pagination({ page, pages, total, size, onPage }: {
             <li key={p}>
               <button type="button" onClick={() => onPage(p)} aria-label={`Trang ${p}`} aria-current={on ? "page" : undefined}
                       className={`${num} ${on
-                        ? "border-transparent bg-gradient-to-br from-[#7c3aed] to-[#db2777] text-white shadow-[0_8px_24px_-8px_#db2777]"
+                        ? "border-transparent bg-gradient-to-br from-[#7c3aed] to-[#7c6cff] text-white shadow-[0_8px_24px_-8px_#7c6cff]"
                         : "border-white/10 bg-white/[0.04] text-mist/80 hover:-translate-y-0.5 hover:border-[#a78bfa]/50 hover:bg-[#a78bfa]/15 hover:text-mist active:scale-95"}`}>
                 {p}
               </button>

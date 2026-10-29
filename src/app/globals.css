@@ -10,8 +10,8 @@
   --color-plum: #1a1530;
   --color-haze: #94a3b8;
   --color-mist: #efeaff;
-  --color-berry: #ff2e93;
-  --color-neon: #2af5d6;
+  --color-berry: #a78bfa;
+  --color-neon: #5eead4;
   /* màu nhấn theo từng game: đặt --accent/--accent2/--on-accent trên khối bọc (xem accentStyle trong game-ui.ts) */
   --color-accent: var(--accent);
   --color-accent2: var(--accent2);
@@ -22,7 +22,7 @@
 
 /* Giữ chỗ thanh cuộn: mở hộp thoại (khóa cuộn) không làm cả trang giật sang phải */
 html { scrollbar-gutter: stable; }
-:root { color-scheme: dark; --accent: #ff2e93; --accent2: #b537f2; --on-accent: #0f0c1a; }
+:root { color-scheme: dark; --accent: #a78bfa; --accent2: #7c6cff; --on-accent: #0f0c1a; }
 
 body {
   background-color: var(--color-ink);
@@ -33,7 +33,7 @@ body {
 html::before {
   content: ""; position: fixed; inset: 0 0 auto 0; height: 100vh; height: 100lvh; z-index: -1; pointer-events: none;
   background-image:
-    radial-gradient(ellipse 50% 80% at 50% 40%, rgba(124, 22, 78, 0.22), transparent),
+    radial-gradient(ellipse 50% 80% at 50% 40%, rgba(60, 44, 130, 0.22), transparent),
     linear-gradient(rgba(139, 92, 246, 0.07) 1px, transparent 1px),
     linear-gradient(90deg, rgba(139, 92, 246, 0.07) 1px, transparent 1px);
   background-size: 100% 100%, 36px 36px, 36px 36px;
@@ -45,9 +45,9 @@ html::before {
 body::before {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background-image:
-    radial-gradient(60rem 38rem at 88% -8%, rgba(255, 46, 147, 0.13), transparent 62%),
-    radial-gradient(52rem 40rem at -8% 6%, rgba(181, 55, 242, 0.16), transparent 62%),
-    radial-gradient(46rem 34rem at 52% 108%, rgba(42, 245, 214, 0.07), transparent 62%);
+    radial-gradient(60rem 38rem at 88% -8%, rgba(167, 139, 250, 0.13), transparent 62%),
+    radial-gradient(52rem 40rem at -8% 6%, rgba(124, 108, 255, 0.16), transparent 62%),
+    radial-gradient(46rem 34rem at 52% 108%, rgba(94, 234, 212, 0.07), transparent 62%);
 }
 
 ::selection { background: var(--color-berry); color: var(--color-ink); }
@@ -63,7 +63,7 @@ body::before {
 .edge { position: relative; }
 .edge::before {
   content: ""; position: absolute; inset: 0; padding: 1px; border-radius: inherit; pointer-events: none;
-  background: linear-gradient(115deg, rgba(255,255,255,0.28), rgba(255,255,255,0.04) 35%, rgba(124,92,255,0.38) 70%, rgba(255,107,152,0.5));
+  background: linear-gradient(115deg, rgba(255,255,255,0.28), rgba(255,255,255,0.04) 35%, rgba(124,92,255,0.38) 70%, rgba(167, 139, 250,0.5));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude;
 }
@@ -99,7 +99,7 @@ html[data-dl-open] #site-header > * { pointer-events: auto; }
 .neon-title { display: flex; align-items: center; gap: 0.75rem; }
 .neon-title::before {
   content: ""; flex: none; width: 4px; height: 1.1em; border-radius: 9999px;
-  background: linear-gradient(180deg, #2af5d6, #ff2e93); box-shadow: 0 0 12px rgba(42, 245, 214, 0.5);
+  background: linear-gradient(180deg, #5eead4, #a78bfa); box-shadow: 0 0 12px rgba(94, 234, 212, 0.5);
 }
 
 /* ---------- Hiệu ứng chuyển (chỉ opacity + transform: chạy trên GPU, không bắt trình duyệt tính lại bố cục) ---------- */

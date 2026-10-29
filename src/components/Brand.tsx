@@ -12,12 +12,12 @@ export default function Brand({ sub }: { sub?: string }) {
       <span className="flex flex-col leading-none max-[339px]:hidden">
         <span className="font-[family-name:var(--font-orbitron)] text-xl font-extrabold sm:text-2xl uppercase tracking-[0.06em]">
           <span className="text-white">{site.name.slice(0, 2)}</span>
-          <span className="bg-[linear-gradient(90deg,#ff47b6_0%,#b537f2_45%,#2af5d6_100%)] bg-clip-text text-transparent">{site.name.slice(2)}</span>
+          <span className="bg-[linear-gradient(90deg,#ff47b6_0%,#7c6cff_45%,#5eead4_100%)] bg-clip-text text-transparent">{site.name.slice(2)}</span>
         </span>
         {white && (
           <span className="mt-1.5 whitespace-nowrap font-[family-name:var(--font-barlow)] text-xs font-semibold uppercase tracking-[0.12em]">
             <span className="text-white">{white}</span>
-            {cyan && <span className="ml-1.5 text-[#2af5d6]">{cyan}</span>}
+            {cyan && <span className="ml-1.5 text-[#5eead4]">{cyan}</span>}
           </span>
         )}
       </span>

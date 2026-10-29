@@ -23,7 +23,7 @@ const Cart = ({ cls = "size-5" }: { cls?: string }) => (
   </svg>
 );
 const cp = "shrink-0 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold transition hover:bg-white/20 active:scale-95";
-const primary = "flex w-full items-center justify-center gap-2 rounded-full bg-berry px-7 py-4 text-base font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50";
+const primary = "flex w-full items-center justify-center gap-2 rounded-full bg-berry px-7 py-4 text-base font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50";
 const ghost = "w-full rounded-full bg-white/10 px-6 py-3 text-sm font-semibold transition hover:bg-white/20 active:scale-95";
 
 export default function CartPage() {
@@ -154,7 +154,7 @@ export default function CartPage() {
       <ol aria-label="Các bước" className="mt-8 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider sm:max-w-xl">
         {["Giỏ hàng", "Chuyển khoản", "Nhận key"].map((s, i) => (
           <li key={s} className="flex flex-1 flex-col gap-2">
-            <span className={`h-1.5 rounded-full transition-colors duration-500 ${i <= step ? "bg-gradient-to-r from-[#2af5d6] to-[#ff2e93]" : "bg-white/10"}`} />
+            <span className={`h-1.5 rounded-full transition-colors duration-500 ${i <= step ? "bg-gradient-to-r from-[#5eead4] to-[#a78bfa]" : "bg-white/10"}`} />
             <span className={i <= step ? "text-mist" : "text-haze/70"}>{s}</span>
           </li>
         ))}
@@ -193,7 +193,7 @@ export default function CartPage() {
             <p className="text-xs uppercase tracking-wider text-haze">Số tiền chính xác</p>
             <button type="button" onClick={() => copy("amt", String(order.amount))} title="Bấm để chép số tiền"
                     className="mt-2 inline-flex flex-wrap items-center justify-center gap-3 font-display text-5xl font-extrabold tabular-nums tracking-tight transition active:scale-95 sm:text-6xl">
-              <span className="bg-gradient-to-r from-[#2af5d6] to-[#ff2e93] bg-clip-text text-transparent">{order.amount.toLocaleString("vi-VN")}đ</span>
+              <span className="bg-gradient-to-r from-[#5eead4] to-[#a78bfa] bg-clip-text text-transparent">{order.amount.toLocaleString("vi-VN")}đ</span>
               <span className="rounded-full bg-white/10 px-3 py-1 font-sans text-xs font-semibold text-mist">{copied === "amt" ? "Đã chép" : "Chép"}</span>
             </button>
             <div className="relative mx-auto mt-6 w-fit rounded-3xl bg-white p-4 shadow-xl shadow-black/40">
@@ -202,12 +202,12 @@ export default function CartPage() {
               {expired && <div className="absolute inset-0 grid place-items-center text-base font-semibold text-neutral-700">Mã đã hết hạn</div>}
             </div>
             <div className="mx-auto mt-6 h-2 w-full max-w-xs overflow-hidden rounded-full bg-white/10" aria-hidden>
-              <div className="h-full rounded-full bg-gradient-to-r from-[#2af5d6] to-[#ff2e93] transition-[width] duration-1000 ease-linear" style={{ width: `${Math.min(100, (left / TTL) * 100)}%` }} />
+              <div className="h-full rounded-full bg-gradient-to-r from-[#5eead4] to-[#a78bfa] transition-[width] duration-1000 ease-linear" style={{ width: `${Math.min(100, (left / TTL) * 100)}%` }} />
             </div>
             <p role="status" aria-live="polite" className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm text-haze">
               {expired ? "Đơn hết hạn. Nếu đã chuyển tiền, hệ thống vẫn ghi nhận." :
                 status === "underpaid" ? `Đã nhận ${fmt(paid ?? 0)}, còn thiếu ${fmt(order.amount - (paid ?? 0))}. Chuyển bù đúng số còn thiếu.` :
-                <><span aria-hidden className="size-2 animate-pulse rounded-full bg-[#2af5d6]" />Đang chờ ngân hàng xác nhận · còn <b className="tabular-nums text-mist">{Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</b></>}
+                <><span aria-hidden className="size-2 animate-pulse rounded-full bg-[#5eead4]" />Đang chờ ngân hàng xác nhận · còn <b className="tabular-nums text-mist">{Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</b></>}
             </p>
           </div>
 
@@ -261,7 +261,7 @@ export default function CartPage() {
           <span className="mx-auto grid size-20 place-items-center rounded-full bg-white/[0.06] text-haze"><Cart cls="size-9" /></span>
           <p className="mx-auto mt-6 max-w-[40ch] text-lg text-haze">Vào trang một game, bấm &ldquo;Mua key&rdquo;, rồi tiếp tục chọn các game khác.</p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/#kho-game" className="rounded-full bg-berry px-8 py-3.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition hover:-translate-y-0.5 active:scale-95">Chọn game</Link>
+            <Link href="/#kho-game" className="rounded-full bg-berry px-8 py-3.5 font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95">Chọn game</Link>
             <Link href="/tai-khoan/key" className="rounded-full bg-white/10 px-8 py-3.5 font-semibold transition hover:bg-white/20 active:scale-95">
               Xem key đã mua{past.length > 0 ? ` (${past.length} đơn)` : ""}
             </Link>
