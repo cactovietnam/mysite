@@ -1,8 +1,9 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { games, thumbOf } from "@/data/games";
+import Link from "next/link";
 import { site } from "@/data/site";
+import { useGameMeta } from "@/lib/game-meta";
 import { useModal } from "@/lib/use-modal";
 import { usePresence } from "@/lib/use-presence";
 import { getSupabase } from "@/lib/supabase";
@@ -14,8 +15,6 @@ type Key = { slug: string; title: string; password: string };
 type Status = "pending" | "paid" | "underpaid" | "expired";
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ";
-const titleOf = (slug: string) => games.find((g) => g.slug === slug)?.title ?? slug;
-const thumbIn = (slug: string) => { const g = games.find((x) => x.slug === slug); return g ? thumbOf(g) : ""; };
 const FB = /^https?:\/\//i.test(site.facebook) ? site.facebook : "";
 const TTL = 30 * 60; // khớp ORDER_TTL_MIN ở src/lib/payment.ts
 
@@ -41,6 +40,9 @@ export default function CartButton() {
   const cart = useCart();
   const past = usePastOrders();
   const [open, setOpen] = useState(false);
+  const meta = useGameMeta(open);
+  const titleOf = (s: string) => meta.get(s)?.title ?? s;
+  const thumbIn = (s: string) => meta.get(s)?.thumb ?? "";
   const { mounted, closing } = usePresence(open);
   const modalRef = useModal(open, () => setOpen(false));
   const [prices, setPrices] = useState<Map<string, Price>>(new Map());
@@ -48,7 +50,6 @@ export default function CartButton() {
   const [status, setStatus] = useState<Status>("pending");
   const [paid, setPaid] = useState<number | null>(null);
   const [keys, setKeys] = useState<Key[]>([]);
-  const [oldKeys, setOldKeys] = useState<Record<string, Key[]>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [left, setLeft] = useState(0);
@@ -60,25 +61,12 @@ export default function CartButton() {
     return () => window.removeEventListener("cart-open", on);
   }, []);
 
-  // Mở giỏ: tải giá + xem lại key của các đơn đã tạo (đơn đã trả tiền mới có key).
+  // Mở giỏ: tải giá (công khai).
   useEffect(() => {
     if (!open) return;
     let dead = false;
     loadKeyPrices().then(() => { if (!dead) setPrices(new Map(priceRows.map((r) => [r.slug, r]))); }, () => { if (!dead) setErr("Không tải được giá. Thử lại sau ít phút."); });
-    (async () => {
-      const found: Record<string, Key[]> = {};
-      for (const o of past.slice(0, 10)) {
-        if (order?.code === o.code) continue;
-        try {
-          const r = await fetch(`/api/orders/${o.code}?t=${o.token}`, { cache: "no-store" });
-          const d = r.ok ? await r.json() as { keys?: Key[] } : null;
-          if (d?.keys?.length) found[o.code] = d.keys;
-        } catch { /* bỏ qua đơn lỗi mạng */ }
-      }
-      if (!dead) setOldKeys(found);
-    })();
     return () => { dead = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const lines = cart.map((slug) => ({ slug, p: prices.get(slug) }));
@@ -146,7 +134,6 @@ export default function CartButton() {
   };
 
   const expired = !!order && (status === "expired" || left === 0);
-  const oldList = Object.entries(oldKeys);
   const cp = "shrink-0 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold transition hover:bg-white/20 active:scale-95";
   const step = !order ? 0 : status === "paid" ? 2 : 1;
   const title = status === "paid" && order ? "Thanh toán thành công" : order ? "Chuyển khoản" : "Giỏ hàng";
@@ -162,7 +149,7 @@ export default function CartButton() {
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} aria-label={`Giỏ hàng${cart.length ? `, ${cart.length} game` : ""}`}
-              className="relative grid size-10 place-items-center rounded-full bg-white/10 transition hover:bg-white/[0.16] active:scale-95">
+              className="relative grid size-9 place-items-center rounded-full bg-white/10 transition hover:bg-white/[0.16] active:scale-95 sm:size-10">
         {cartIcon}
         {cart.length > 0 && <span className="absolute -right-0.5 -top-0.5 grid min-w-[1.1rem] place-items-center rounded-full bg-berry px-1 text-[10px] font-bold leading-[1.1rem] text-ink">{cart.length}</span>}
       </button>
@@ -194,27 +181,33 @@ export default function CartButton() {
               ))}
             </ol>
 
-            {/* ---- đã thanh toán: hiện key ---- */}
+            {/* ---- đã thanh toán: bảng xác nhận + nút Hiện key (sang trang Key đã mua) ---- */}
             {order && status === "paid" && (
               <div role="status" className="mt-5 space-y-3">
-                <div className="flex items-center gap-3 rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
-                  <svg viewBox="0 0 24 24" className="size-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="9.5" /><path d="m7.5 12.5 3 3 6-6.5" /></svg>
-                  <span>Đã nhận <b>{fmt(paid ?? order.amount)}</b>. Mật khẩu ZIP của bạn đây, xem lại được trong giỏ hàng trên trình duyệt này.</span>
+                <div className="anim-pop rounded-3xl border border-emerald-400/25 bg-emerald-500/10 p-5 text-center">
+                  <span className="mx-auto grid size-14 place-items-center rounded-full bg-emerald-500/20 text-emerald-300">
+                    <svg viewBox="0 0 24 24" className="size-8" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m5.5 12.5 4.2 4.2 8.8-9.2" /></svg>
+                  </span>
+                  <p className="mt-3 font-display text-xl font-bold">Đã thanh toán</p>
+                  <p className="mt-1 text-sm text-haze">Đã nhận <b className="text-mist">{fmt(paid ?? order.amount)}</b> · đơn <span className="font-mono">{order.code}</span></p>
                 </div>
-                {keys.length === 0 && <p className="rounded-2xl bg-white/[0.06] px-4 py-3 text-sm text-haze">Đang lấy key…</p>}
-                {keys.map((k) => (
-                  <div key={k.slug} className="anim-pop flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {thumbIn(k.slug) ? <img src={thumbIn(k.slug)} alt="" className="size-14 shrink-0 rounded-xl object-cover" /> : <span className="size-14 shrink-0 rounded-xl bg-white/10" />}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs text-haze">{k.title}</p>
-                      <code className="block break-all font-mono text-lg font-bold tracking-wide text-berry">{k.password}</code>
-                    </div>
-                    <button type="button" onClick={() => copy(k.slug, k.password)} className={cp}>{copied === k.slug ? "Đã chép" : "Chép"}</button>
-                  </div>
-                ))}
+                {keys.length === 0 ? <p className="rounded-2xl bg-white/[0.06] px-4 py-3 text-center text-sm text-haze">Đang chuẩn bị key…</p> : (
+                  <ul className="space-y-2">
+                    {keys.map((k) => (
+                      <li key={k.slug} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-2.5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {thumbIn(k.slug) ? <img src={thumbIn(k.slug)} alt="" className="size-12 shrink-0 rounded-xl object-cover" /> : <span className="size-12 shrink-0 rounded-xl bg-white/10" />}
+                        <span className="min-w-0 flex-1 text-sm font-semibold leading-snug">{k.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Link href={`/tai-khoan/key?order=${order.code}`} onClick={() => { setOpen(false); reset(); }}
+                      className="flex w-full items-center justify-center gap-2 rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition hover:-translate-y-0.5 active:scale-95">
+                  <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="8" cy="15" r="4" /><path d="m11 12 8-8m-3 3 3 3m-6-6 2 2" /></svg>
+                  Hiện key
+                </Link>
                 {keys.length === 0 && help}
-                <button type="button" onClick={reset} className="w-full rounded-full bg-white/10 px-6 py-3 text-sm font-semibold transition hover:bg-white/20 active:scale-95">Xong</button>
               </div>
             )}
 
@@ -310,22 +303,14 @@ export default function CartButton() {
                   </button>
                 )}
 
-                {oldList.length > 0 && (
-                  <div className="mt-6 border-t border-white/10 pt-4">
-                    <h3 className="text-sm font-semibold">Key đã mua</h3>
-                    <ul className="mt-2 space-y-2">
-                      {oldList.flatMap(([code, ks]) => ks.map((k) => (
-                        <li key={code + k.slug} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-2.5">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          {thumbIn(k.slug) ? <img src={thumbIn(k.slug)} alt="" loading="lazy" className="size-12 shrink-0 rounded-xl object-cover" /> : <span className="size-12 shrink-0 rounded-xl bg-white/10" />}
-                          <span className="min-w-0 flex-1"><span className="block truncate text-sm">{k.title}</span><code className="font-mono text-sm font-bold text-berry">{k.password}</code></span>
-                          <button type="button" onClick={() => copy(code + k.slug, k.password)} className={cp}>{copied === code + k.slug ? "Đã chép" : "Chép"}</button>
-                        </li>
-                      )))}
-                    </ul>
-                    {FB && <a href={FB} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-xs text-haze underline decoration-white/20 underline-offset-4 transition hover:text-mist">Không nhận được pass? Nhắn Facebook</a>}
-                  </div>
+                {past.length > 0 && (
+                  <Link href="/tai-khoan/key" onClick={() => setOpen(false)}
+                        className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm transition hover:bg-white/[0.09]">
+                    <span><b className="block">Key đã mua</b><span className="text-xs text-haze">{past.length} đơn trên trình duyệt này</span></span>
+                    <span aria-hidden className="text-lg text-berry">&rarr;</span>
+                  </Link>
                 )}
+                {FB && <a href={FB} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-xs text-haze underline decoration-white/20 underline-offset-4 transition hover:text-mist">Không nhận được pass? Nhắn Facebook</a>}
               </div>
             )}
           </div>

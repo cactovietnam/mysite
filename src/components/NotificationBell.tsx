@@ -41,7 +41,7 @@ export default function NotificationBell({ notice, items }: { notice: string; it
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={toggle} aria-expanded={open} aria-haspopup="menu" aria-label="Thông báo"
-              className="relative grid size-10 place-items-center rounded-full bg-white/10 transition hover:bg-white/[0.16] active:scale-95">
+              className="relative grid size-9 place-items-center rounded-full bg-white/10 sm:size-10 transition hover:bg-white/[0.16] active:scale-95">
         <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M6 9a6 6 0 1 1 12 0c0 6 2 7.5 2 7.5H4S6 15 6 9ZM10 20a2 2 0 0 0 4 0" />
         </svg>

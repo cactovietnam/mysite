@@ -120,7 +120,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
           <div className="flex flex-wrap gap-2.5">
             {chip("all", "Tất cả", games.length)}
             {engines.map((e) => chip(e, e, games.filter((g) => g.engine === e).length))}
-            {([["fav", "Yêu thích", alive(fav), "#fb7185"], ["seen", "Đã xem", alive(seen), "#38bdf8"]] as const).map(([k, label, n, c]) => {
+            {([["fav", "Yêu thích", alive(fav), "#fb7185"], ["seen", "Đã xem", alive(seen), "#38bdf8"]] as const).filter(([k]) => filters.list === k).map(([k, label, n, c]) => {
               const on = filters.list === k;
               return (
                 <button key={k} onClick={() => swap(() => update({ list: on ? "all" : k }))} aria-pressed={on} style={tone(c, on)}

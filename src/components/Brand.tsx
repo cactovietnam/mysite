@@ -6,11 +6,11 @@ import { site } from "@/data/site";
 export default function Brand({ sub }: { sub?: string }) {
   const [white, cyan] = (sub ?? "").split("·").map((s) => s.trim());
   return (
-    <HomeLink aria-label={site.name} className="group flex shrink-0 items-center gap-3">
+    <HomeLink aria-label={site.name} className="group flex shrink-0 items-center gap-2 sm:gap-3">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo-gsvh.svg" alt="" width={45} height={48} className="h-12 w-[45px] shrink-0 transition duration-300 group-hover:scale-105" />
-      <span className="flex flex-col leading-none">
-        <span className="font-[family-name:var(--font-orbitron)] text-2xl font-extrabold uppercase tracking-[0.06em]">
+      <img src="/logo-gsvh.svg" alt="" width={45} height={48} className="h-10 w-[38px] shrink-0 sm:h-12 sm:w-[45px] transition duration-300 group-hover:scale-105" />
+      <span className="flex flex-col leading-none max-[339px]:hidden">
+        <span className="font-[family-name:var(--font-orbitron)] text-xl font-extrabold sm:text-2xl uppercase tracking-[0.06em]">
           <span className="text-white">{site.name.slice(0, 2)}</span>
           <span className="bg-[linear-gradient(90deg,#ff47b6_0%,#b537f2_45%,#2af5d6_100%)] bg-clip-text text-transparent">{site.name.slice(2)}</span>
         </span>

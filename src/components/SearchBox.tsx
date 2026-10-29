@@ -71,7 +71,7 @@ export default function SearchBox() {
   return (
     <>
       <button onClick={show} onPointerEnter={warm} onFocus={warm} aria-label="Tìm kiếm"
-              className="flex h-10 items-center justify-center rounded-lg border border-[rgba(148,163,184,0.22)] bg-[rgba(30,27,46,0.85)] px-3 text-sm text-slate-400 transition hover:border-[#2af5d6]/40 hover:text-white sm:w-44 sm:justify-between xl:w-60 sm:px-4">
+              className="flex h-9 items-center justify-center rounded-lg sm:h-10 border border-[rgba(148,163,184,0.22)] bg-[rgba(30,27,46,0.85)] px-2.5 text-sm text-slate-400 transition hover:border-[#2af5d6]/40 hover:text-white sm:w-44 sm:justify-between xl:w-60 sm:px-4">
         <span className="hidden sm:inline">Tìm kiếm game...</span>
         <span className="flex items-center gap-2">
           <kbd className="hidden rounded-md bg-white/10 px-1.5 py-0.5 font-sans text-[11px] text-haze xl:inline">Ctrl K</kbd>

@@ -61,7 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <>
               {donateConfig.enabled && (
                 <Link href="/donate" aria-label={donateNavLabel} title={donateNavLabel}
-                      className="grid size-10 place-items-center rounded-full text-berry transition hover:bg-white/10 md:hidden">
+                      className="grid size-9 place-items-center rounded-full text-berry transition hover:bg-white/10 max-[399px]:hidden sm:size-10 md:hidden">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2Z" />
                   </svg>

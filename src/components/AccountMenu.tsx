@@ -4,12 +4,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { authConfigured, getSupabase } from "@/lib/supabase";
 import { displayName, useAuthUser } from "@/lib/auth-store";
-import { games } from "@/data/games";
+import { donateConfig, donateNavLabel } from "@/data/donate";
 import { useList } from "@/lib/user-lists";
 import { openCart } from "@/lib/cart";
 import { softNav } from "@/lib/soft-nav";
 
-const alive = (l: string[]) => l.filter((s) => games.some((g) => g.slug === s)).length; // bỏ qua game đã xóa
 const num = "rounded-full bg-white/10 px-2 py-0.5 text-xs tabular-nums text-haze";
 const item = "block w-full rounded-xl px-3 py-2 text-left text-sm text-mist/90 transition hover:bg-white/10";
 const itemRow = item.replace("block", "flex items-center justify-between");
@@ -21,8 +20,8 @@ export default function AccountMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
-  const fav = alive(useList("fav"));
-  const seen = alive(useList("seen"));
+  const fav = useList("fav").length;
+  const seen = useList("seen").length;
 
   useEffect(() => {
     if (!open) return;
@@ -35,7 +34,7 @@ export default function AccountMenu() {
 
   if (!authConfigured) return null;
   // Chưa biết trạng thái: giữ chỗ để header không giật khi hydrate xong
-  if (user === undefined) return <span aria-hidden className="h-10 w-10 sm:w-[7.5rem]" />;
+  if (user === undefined) return <span aria-hidden className="h-9 w-9 sm:h-10 sm:w-[7.5rem]" />;
 
   const name = user ? displayName(user) : "";
 
@@ -43,7 +42,7 @@ export default function AccountMenu() {
     <div ref={ref} className="relative">
       {user ? (
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label={`Tài khoản ${name}`}
-                className="flex h-10 items-center gap-2 rounded-full bg-white/10 pl-1.5 pr-3 text-sm transition hover:bg-white/[0.16] sm:pr-4">
+                className="flex h-9 items-center gap-2 rounded-full bg-white/10 pl-1 pr-1 text-sm transition hover:bg-white/[0.16] sm:h-10 sm:pl-1.5 sm:pr-4">
           <span aria-hidden className="grid size-7 place-items-center rounded-full bg-gradient-to-br from-berry to-[#7c5cff] text-xs font-bold uppercase text-ink">
             {name.slice(0, 1)}
           </span>
@@ -51,7 +50,7 @@ export default function AccountMenu() {
         </button>
       ) : (
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label="Menu tài khoản"
-                className="grid size-10 place-items-center rounded-full bg-[linear-gradient(135deg,#2af5d6,#ff2e93)] p-[2px] transition active:scale-95">
+                className="grid size-9 place-items-center rounded-full bg-[linear-gradient(135deg,#2af5d6,#ff2e93)] p-[2px] transition active:scale-95 sm:size-10">
           <span className="grid size-full place-items-center rounded-full bg-[#14102b]"><svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
             {open ? <path d="m5 5 10 10M15 5 5 15" /> : <><circle cx="10" cy="7" r="3.2" /><path d="M3.5 17c.8-3.3 3.3-5 6.5-5s5.7 1.7 6.5 5" /></>}
           </svg></span>
@@ -71,7 +70,9 @@ export default function AccountMenu() {
                   {label}<span className={num}>{n}</span>
                 </Link>
               ))}
-              <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); openCart(); }}>Giỏ hàng &amp; key đã mua</button>
+              <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>
+              <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); openCart(); }}>Giỏ hàng</button>
+              {donateConfig.enabled && <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>}
               <div className="my-1 border-t border-white/10" />
               <button type="button" role="menuitem" className={item}
                       onClick={() => { setOpen(false); void getSupabase()?.auth.signOut(); }}>
@@ -90,7 +91,9 @@ export default function AccountMenu() {
                   {label}<span className={num}>{n}</span>
                 </Link>
               ))}
-              <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); openCart(); }}>Giỏ hàng &amp; key đã mua</button>
+              <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>
+              <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); openCart(); }}>Giỏ hàng</button>
+              {donateConfig.enabled && <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>}
             </>
           )}
         </div>

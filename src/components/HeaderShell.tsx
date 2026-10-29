@@ -77,7 +77,7 @@ export default function HeaderShell({ brand, brandBig, nav, tools }: Props) {
         </div>
 
         {/* Cả khối trượt lên (96px = 104px logo to - 8px đệm thêm khi thu nhỏ, như bản cũ). */}
-        <div className="relative mx-auto max-w-6xl px-3 will-change-transform md:[transform:translate3d(0,calc(var(--hp)*-96px),0)]">
+        <div className="relative mx-auto max-w-6xl px-1 will-change-transform sm:px-3 md:[transform:translate3d(0,calc(var(--hp)*-96px),0)]">
           {/* Nền pill ĐẶC: hiện dần, từ hẹp nở ra + trượt nhẹ vào vị trí.
               Lớp ngoài chỉ định vị (absolute), lớp trong mới mang .edge:
               .edge đặt position:relative trong globals.css nên KHÔNG được gộp chung với absolute. */}
@@ -126,7 +126,7 @@ export default function HeaderShell({ brand, brandBig, nav, tools }: Props) {
               {brand}
             </div>
             {nav}
-            <div className="ml-auto flex shrink-0 items-center gap-1.5 justify-self-end whitespace-nowrap will-change-transform md:ml-0 xl:[transform:translate3d(0,calc((1-var(--hp))*-80px),0)]">
+            <div className="ml-auto flex shrink-0 items-center gap-1 justify-self-end sm:gap-1.5 whitespace-nowrap will-change-transform md:ml-0 xl:[transform:translate3d(0,calc((1-var(--hp))*-80px),0)]">
               {tools}
             </div>
           </div>
