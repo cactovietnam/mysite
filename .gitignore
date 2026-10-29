@@ -50,3 +50,6 @@ anh-goc/
 
 # quan_ly.py
 .env.local
+
+# quan_ly.py
+.announce-pending.json

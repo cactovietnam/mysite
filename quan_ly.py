@@ -786,6 +786,7 @@ def do_add_game():
     print(f"  ✓ Đã thêm '{title}' (địa chỉ: /game/{g['slug']})")
     print("\n--- ẢNH CHO GAME NÀY ---")
     if image_wizard(g): save(games)
+    queue_announce(g["slug"])
     return True
 
 def do_edit_game():
@@ -1014,7 +1015,7 @@ def ensure_gitignore():
     gi = ROOT / ".gitignore"
     text = gi.read_text(encoding="utf-8") if gi.exists() else ""
     have = {l.strip() for l in text.splitlines()}
-    add = [x for x in ("anh-moi/", "anh-goc/", "backup/", "__pycache__/", ".env.local") if x not in have]
+    add = [x for x in ("anh-moi/", "anh-goc/", "backup/", "__pycache__/", ".env.local", ".announce-pending.json") if x not in have]
     if add:
         gi.write_text(text.rstrip("\n") + ("\n" if text else "") + "\n# quan_ly.py\n" + "\n".join(add) + "\n", encoding="utf-8")
         print(f"  (Đã thêm vào .gitignore: {', '.join(add)})")
@@ -1062,7 +1063,109 @@ def do_push():
     if r.returncode != 0:
         print(f"\n  ✗ Lỗi ở 'git push':\n{r.stderr or r.stdout}"); return False
     print("\n  ✓ Đã đẩy lên GitHub. Vercel build ~1 phút rồi tự cập nhật site.")
+    flush_announces()
     return True
+
+
+# ---------- thông báo game mới lên Discord (bot) ----------
+# .env.local cần 2 dòng:  DISCORD_BOT_TOKEN=...   DISCORD_ANNOUNCE_CHANNEL_ID=...
+# Bot cần quyền trong kênh: View Channel, Send Messages, Embed Links, Attach Files.
+import time as _time
+DISCORD_API = "https://discord.com/api/v10"
+PENDING = ROOT / ".announce-pending.json"   # slug game chờ thông báo (nằm trong .gitignore)
+BOT_TOKEN_RE = re.compile(r"^[\w.\-]{30,}$")
+CHANNEL_RE = re.compile(r"^\d{15,25}$")
+MAX_UPLOAD = 8 * 1024 * 1024                # giới hạn upload mặc định của Discord
+
+def _pending():
+    try:
+        d = json.loads(PENDING.read_text(encoding="utf-8"))
+        return [s for s in d if isinstance(s, str)] if isinstance(d, list) else []
+    except Exception:
+        return []
+
+def _save_pending(slugs):
+    if not slugs:
+        PENDING.unlink(missing_ok=True); return
+    tmp = PENDING.with_name(PENDING.name + ".tmp")
+    tmp.write_text(json.dumps(slugs), encoding="utf-8"); os.replace(tmp, PENDING)
+
+def queue_announce(slug):
+    p = _pending()
+    if slug not in p:
+        p.append(slug); _save_pending(p)
+
+def _multipart(payload, fname, data, mime):
+    b = "----gsvh" + secrets.token_hex(8)
+    body = (f'--{b}\r\nContent-Disposition: form-data; name="payload_json"\r\nContent-Type: application/json\r\n\r\n'.encode()
+            + json.dumps(payload).encode("utf-8") + b"\r\n"
+            + f'--{b}\r\nContent-Disposition: form-data; name="files[0]"; filename="{fname}"\r\nContent-Type: {mime}\r\n\r\n'.encode()
+            + data + f"\r\n--{b}--\r\n".encode())
+    return body, f"multipart/form-data; boundary={b}"
+
+def _discord_post(channel, token, body, ctype):
+    url = f"{DISCORD_API}/channels/{channel}/messages"
+    hdr = {"Content-Type": ctype, "Authorization": f"Bot {token}", "User-Agent": UA}
+    hints = {401: "token bot sai/đã bị reset", 403: "bot thiếu quyền trong kênh (View Channel, Send Messages, Embed Links, Attach Files)",
+             404: "sai Channel ID hoặc bot chưa được mời vào server"}
+    for attempt in (1, 2):
+        req = urllib.request.Request(url, data=body, method="POST", headers=hdr)
+        try:
+            urllib.request.urlopen(req, timeout=30).read(); return
+        except urllib.error.HTTPError as e:
+            raw = e.read().decode("utf-8", "replace")
+            if e.code == 429 and attempt == 1:      # rate limit: chờ theo retry_after rồi thử lại 1 lần
+                try: wait = float(json.loads(raw).get("retry_after", 2))
+                except Exception: wait = 2.0
+                _time.sleep(min(wait, 10) + 0.2); continue
+            hint = f" ({hints[e.code]})" if e.code in hints else ""
+            raise RuntimeError(f"Discord từ chối (mã {e.code}){hint}: {raw[:200]}") from None
+
+def announce_game(g, token, channel):
+    site = load_site()
+    base = (site.get("url") or "").rstrip("/")
+    desc = g.get("intro") or (g["content"][0] if g["content"] else "")
+    if len(desc) > 300: desc = desc[:297].rstrip() + "..."
+    tags = ", ".join(g["tags"])
+    if len(tags) > 1000: tags = tags[:997] + "..."
+    fields = [{"name": "Engine", "value": str(g.get("engine") or "—"), "inline": True},
+              {"name": "Phiên bản", "value": str(g.get("version") or "—"), "inline": True},
+              {"name": "Dung lượng", "value": f"{g.get('sizeGB', 0)} GB", "inline": True}]
+    if tags: fields.append({"name": "Nhãn", "value": tags, "inline": False})
+    try: color = int(str(g.get("accent", "")).lstrip("#"), 16)
+    except ValueError: color = 0xEE5A96
+    embed = {"title": f"🎮 Game mới: {g['title']}"[:256], "fields": fields, "color": color}
+    if desc: embed["description"] = desc
+    if base: embed["url"] = f"{base}/game/{g['slug']}"
+    if site.get("name"): embed["footer"] = {"text": str(site["name"])[:2048]}
+    payload = {"allowed_mentions": {"parse": []}, "embeds": [embed]}
+    cover = PUBLIC / g["cover"].lstrip("/") if g.get("cover") else None
+    if cover and cover.is_file() and cover.stat().st_size <= MAX_UPLOAD:
+        fname = "cover" + cover.suffix.lower()      # tên ASCII an toàn cho header multipart
+        embed["image"] = {"url": f"attachment://{fname}"}
+        mime = {".webp": "image/webp", ".png": "image/png", ".gif": "image/gif"}.get(cover.suffix.lower(), "image/jpeg")
+        body, ctype = _multipart(payload, fname, cover.read_bytes(), mime)
+    else:
+        if g.get("cover") and base: embed["image"] = {"url": base + "/" + g["cover"].lstrip("/")}
+        body, ctype = json.dumps(payload).encode("utf-8"), "application/json"
+    _discord_post(channel, token, body, ctype)
+
+def flush_announces():
+    slugs = _pending()
+    if not slugs: return
+    env = _read_env()
+    token, channel = env.get("DISCORD_BOT_TOKEN", ""), env.get("DISCORD_ANNOUNCE_CHANNEL_ID", "")
+    if not (BOT_TOKEN_RE.match(token) and CHANNEL_RE.match(channel)):
+        print("  (Chưa đủ DISCORD_BOT_TOKEN / DISCORD_ANNOUNCE_CHANNEL_ID trong .env.local nên chưa thông báo Discord; game vẫn chờ trong hàng đợi.)"); return
+    if has_git() and run("git", "ls-files", "--", ".env.local").stdout.strip():
+        print("  ✗ .env.local đang được git theo dõi: token bot có thể ĐÃ LÊN GITHUB. Chạy: git rm --cached .env.local, rồi Reset Token trong Discord Developer Portal.")
+        return
+    games = {g["slug"]: g for g in load()}; left = []
+    for s in slugs:
+        if s not in games: continue
+        try: announce_game(games[s], token, channel); print(f"  ✓ Đã thông báo Discord: {games[s]['title']}")
+        except Exception as e: print(f"  ✗ Thông báo '{s}' lỗi: {e}"); left.append(s)
+    _save_pending(left)
 
 
 # ---------- kiểm tra lỗi ----------

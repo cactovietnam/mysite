@@ -204,6 +204,209 @@ export async function GET(req: Request) {
 }
 
 
+=== FILE: src/app/api/keys/route.ts ===
+
+import { adminClient } from "@/lib/auth-server";
+import { json } from "@/lib/admin-guard";
+import { reportError } from "@/lib/notify";
+import { games } from "@/data/games";
+
+// Giá key công khai (KHÔNG có mật khẩu). Chỉ game đang bật, đã có mật khẩu và vẫn còn trong games.json.
+// price + fee là giá hiển thị; số tiền thật của đơn luôn do /api/orders tính lại ở server.
+export async function GET() {
+  try {
+    const { data, error } = await adminClient().from("game_keys")
+      .select("slug, price, fee").eq("enabled", true).neq("password", "");
+    if (error) throw error;
+    const alive = new Set(games.map((g) => g.slug));
+    const items = (data ?? []).filter((r) => alive.has(r.slug) && r.price + r.fee > 0);
+    return json({ items });
+  } catch (e) {
+    await reportError(e, { source: "server", path: "/api/keys", method: "GET" });
+    return json({ code: "error" }, 500);
+  }
+}
+
+
+=== FILE: src/app/api/orders/mine/route.ts ===
+
+import { adminClient, sameOrigin } from "@/lib/auth-server";
+import { json } from "@/lib/admin-guard";
+import { reportError } from "@/lib/notify";
+import { games } from "@/data/games";
+
+// GET (Bearer token đăng nhập): các đơn key ĐÃ THANH TOÁN gắn với tài khoản này, kèm key. Dùng cho trang /tai-khoan/key.
+// Chỉ đơn tạo lúc đang đăng nhập mới có user_id; đơn tạo lúc chưa đăng nhập vẫn xem được trên đúng trình duyệt đã mua.
+export async function GET(req: Request) {
+  if (!sameOrigin(req)) return json({ code: "forbidden" }, 403);
+  const token = req.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
+  if (!token) return json({ code: "unauthorized" }, 401);
+  try {
+    const db = adminClient();
+    const uid = (await db.auth.getUser(token)).data.user?.id;
+    if (!uid) return json({ code: "unauthorized" }, 401);
+
+    const { data: orders, error } = await db.from("orders").select("id, code, amount, paid_at")
+      .eq("user_id", uid).eq("kind", "key").eq("status", "paid").order("paid_at", { ascending: false }).limit(50);
+    if (error) throw error;
+    if (!orders?.length) return json({ orders: [] });
+
+    const { data: items, error: e2 } = await db.from("order_items").select("order_id, slug").in("order_id", orders.map((o) => o.id));
+    if (e2) throw e2;
+    const slugs = [...new Set((items ?? []).map((i) => i.slug))];
+    const { data: keys, error: e3 } = await db.from("game_keys").select("slug, password").in("slug", slugs);
+    if (e3) throw e3;
+    const pw = new Map((keys ?? []).map((k) => [k.slug, k.password]));
+
+    return json({
+      orders: orders.map((o) => ({
+        code: o.code, amount: o.amount, paidAt: o.paid_at,
+        keys: (items ?? []).filter((i) => i.order_id === o.id).map((i) => ({
+          slug: i.slug, title: games.find((g) => g.slug === i.slug)?.title ?? i.slug, password: pw.get(i.slug) ?? "",
+        })),
+      })),
+    });
+  } catch (e) {
+    await reportError(e, { source: "server", path: "/api/orders/mine", method: "GET" });
+    return json({ code: "error" }, 500);
+  }
+}
+
+
+=== FILE: src/app/api/orders/route.ts ===
+
+import { adminClient, sameOrigin } from "@/lib/auth-server";
+import { json } from "@/lib/admin-guard";
+import { reportError } from "@/lib/notify";
+import { games } from "@/data/games";
+import { MAX_AMOUNT, MIN_AMOUNT, ORDER_TTL_MIN, bankInfo, newOrderCode, qrUrl } from "@/lib/payment";
+
+// shortcut: đếm theo từng instance serverless, chỉ là lưới thô chống spam tạo đơn.
+const hits = new Map<string, { n: number; reset: number }>();
+const MAX_PER_MIN = 6;
+const MAX_ITEMS = 20;
+
+// POST {slugs: string[]} -> đơn mua key (giá tính ở server)   |   POST {amount, note?} -> đơn donate.
+// Đăng nhập là tùy chọn: có token hợp lệ thì gắn user_id.
+export async function POST(req: Request) {
+  if (!sameOrigin(req)) return json({ code: "forbidden" }, 403);
+
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const now = Date.now();
+  if (hits.size > 1000) hits.clear();
+  const h = hits.get(ip);
+  if (!h || now > h.reset) hits.set(ip, { n: 1, reset: now + 60_000 });
+  else if (++h.n > MAX_PER_MIN) return json({ code: "rate" }, 429);
+
+  let b: { amount?: unknown; note?: unknown; slugs?: unknown };
+  try { b = await req.json(); } catch { return json({ code: "invalid" }, 400); }
+
+  try {
+    const db = adminClient();
+    const token = req.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
+    let userId: string | null = null;
+    if (token) userId = (await db.auth.getUser(token)).data.user?.id ?? null;
+    const expiresAt = new Date(Date.now() + ORDER_TTL_MIN * 60_000).toISOString();
+
+    // ---------- đơn mua key ----------
+    if (Array.isArray(b.slugs)) {
+      const slugs = [...new Set(b.slugs.filter((s): s is string => typeof s === "string"))];
+      if (slugs.length === 0 || slugs.length > MAX_ITEMS) return json({ code: "invalid" }, 400);
+      const alive = new Set(games.map((g) => g.slug));
+      if (slugs.some((s) => !alive.has(s))) return json({ code: "invalid" }, 400);
+
+      const { data: rows, error: e1 } = await db.from("game_keys").select("slug, price, fee")
+        .in("slug", slugs).eq("enabled", true).neq("password", "");
+      if (e1) throw e1;
+      if (!rows || rows.length !== slugs.length) return json({ code: "unavailable" }, 409); // có game đã tắt bán / chưa có key
+      const subtotal = rows.reduce((s, r) => s + r.price + r.fee, 0);
+      if (subtotal < MIN_AMOUNT || subtotal > MAX_AMOUNT) return json({ code: "invalid_amount" }, 400);
+
+      // Dọn đơn hết hạn để số tiền lẻ được dùng lại (chỉ mục UNIQUE theo số tiền của đơn đang chờ).
+      await db.from("orders").update({ status: "expired" }).eq("status", "pending").eq("kind", "key").lt("expires_at", new Date().toISOString());
+
+      for (let i = 0; i < 12; i++) {
+        const suffix = 1 + Math.floor(Math.random() * 999);
+        const amount = subtotal + suffix;
+        const code = newOrderCode();
+        const { data: order, error } = await db.from("orders")
+          .insert({ code, amount, suffix, kind: "key", user_id: userId, expires_at: expiresAt })
+          .select("id, token").single();
+        if (error) { if (error.code === "23505") continue; throw error; } // trùng mã hoặc trùng số tiền: thử lại
+        const ins = await db.from("order_items").insert(rows.map((r) => ({ order_id: order.id, slug: r.slug, price: r.price, fee: r.fee })));
+        if (ins.error) { await db.from("orders").delete().eq("id", order.id); throw ins.error; }
+        return json({ code, token: order.token, amount, suffix, subtotal, expiresAt, qr: qrUrl(amount, code), bank: bankInfo() });
+      }
+      return json({ code: "busy" }, 503);
+    }
+
+    // ---------- đơn donate ----------
+    const amount = b.amount;
+    if (typeof amount !== "number" || !Number.isInteger(amount) || amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
+      return json({ code: "invalid_amount", min: MIN_AMOUNT, max: MAX_AMOUNT }, 400);
+    }
+    const note = typeof b.note === "string" ? b.note.trim().slice(0, 100) : "";
+    for (let i = 0; i < 5; i++) {
+      const code = newOrderCode();
+      const { error } = await db.from("orders").insert({ code, amount, note, user_id: userId, kind: "donate", expires_at: expiresAt });
+      if (!error) return json({ code, amount, expiresAt, qr: qrUrl(amount, code), bank: bankInfo() });
+      if (error.code !== "23505") throw error;
+    }
+    throw new Error("Không sinh được mã đơn duy nhất");
+  } catch (e) {
+    await reportError(e, { source: "server", path: "/api/orders", method: "POST" });
+    return json({ code: "error" }, 500);
+  }
+}
+
+
+=== FILE: src/app/api/orders/[code]/route.ts ===
+
+import { timingSafeEqual } from "node:crypto";
+import { adminClient } from "@/lib/auth-server";
+import { json } from "@/lib/admin-guard";
+import { reportError } from "@/lib/notify";
+import { ORDER_PREFIX } from "@/lib/payment";
+import { games } from "@/data/games";
+
+const safeEq = (a: string, b: string) => {
+  const x = Buffer.from(a), y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+};
+
+// GET /api/orders/GSVHxxxxxx?t=<token>: trạng thái đơn. Đơn key đã thanh toán + đúng token thì trả luôn key.
+// Token chỉ có ở trình duyệt đã tạo đơn, nên biết mã đơn thôi thì không lấy được key.
+export async function GET(req: Request, { params }: { params: Promise<{ code: string }> }) {
+  const { code } = await params;
+  if (!new RegExp(`^${ORDER_PREFIX}[A-Z0-9]{6}$`).test(code)) return json({ code: "invalid" }, 400);
+  const t = new URL(req.url).searchParams.get("t") ?? "";
+
+  try {
+    const db = adminClient();
+    const { data, error } = await db.from("orders")
+      .select("id, kind, status, amount, paid_amount, expires_at, token").eq("code", code).maybeSingle();
+    if (error) throw error;
+    if (!data) return json({ code: "not_found" }, 404);
+    const expired = data.status === "pending" && Date.parse(data.expires_at) < Date.now();
+    const out: Record<string, unknown> = { status: expired ? "expired" : data.status, amount: data.amount, paidAmount: data.paid_amount };
+
+    if (data.kind === "key" && data.status === "paid" && t && safeEq(t, data.token)) {
+      const { data: items, error: e2 } = await db.from("order_items").select("slug").eq("order_id", data.id);
+      if (e2) throw e2;
+      const slugs = (items ?? []).map((i) => i.slug);
+      const { data: keys, error: e3 } = await db.from("game_keys").select("slug, password").in("slug", slugs);
+      if (e3) throw e3;
+      const pw = new Map((keys ?? []).map((k) => [k.slug, k.password]));
+      out.keys = slugs.map((s) => ({ slug: s, title: games.find((g) => g.slug === s)?.title ?? s, password: pw.get(s) ?? "" }));
+    }
+    return json(out);
+  } catch (e) {
+    await reportError(e, { source: "server", path: "/api/orders/[code]", method: "GET" });
+    return json({ code: "error" }, 500);
+  }
+}
+
+
 === FILE: src/app/api/report-error/route.ts ===
 
 import { NextResponse } from "next/server";
@@ -234,6 +437,63 @@ export async function POST(req: Request) {
   err.stack = typeof b.stack === "string" ? b.stack.slice(0, 2000) : undefined;
   await reportError(err, { source: "client", path: typeof b.path === "string" ? b.path.slice(0, 200) : undefined });
   return new NextResponse(null, { status: 204 });
+}
+
+
+=== FILE: src/app/api/webhooks/sepay/route.ts ===
+
+import { timingSafeEqual } from "node:crypto";
+import { adminClient } from "@/lib/auth-server";
+import { json } from "@/lib/admin-guard";
+import { reportError } from "@/lib/notify";
+import { donateConfig } from "@/data/donate";
+
+// Webhook SePay (biến động số dư MB Bank). Cấu hình ở my.sepay.vn > Tích hợp Webhooks:
+//   URL: https://<domain>/api/webhooks/sepay | Kiểu chứng thực: API Key | Header gửi: "Authorization: Apikey <SEPAY_API_KEY>"
+// Việc duyệt đơn nằm trong hàm SQL process_bank_tx (một transaction, khóa dòng, idempotent theo provider_tx_id).
+type Payload = {
+  id?: number | string; gateway?: string; accountNumber?: string; code?: string | null; content?: string;
+  transferType?: string; transferAmount?: number; referenceCode?: string; description?: string;
+};
+
+const safeEq = (a: string, b: string) => {
+  const x = Buffer.from(a), y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+};
+
+export async function POST(req: Request) {
+  const secret = process.env.SEPAY_API_KEY;
+  if (!secret) {
+    await reportError(new Error("Thiếu SEPAY_API_KEY"), { source: "server", path: "/api/webhooks/sepay", method: "POST" });
+    return json({ success: false }, 500);
+  }
+  const auth = req.headers.get("authorization")?.match(/^Apikey (.+)$/i)?.[1] ?? "";
+  if (!auth || !safeEq(auth, secret)) return json({ success: false }, 401);
+
+  let p: Payload;
+  try { p = await req.json(); } catch { return json({ success: false }, 400); }
+
+  // Chỉ xử lý tiền VÀO, đúng tài khoản nhận. Các giao dịch khác trả 200 để SePay không gọi lại.
+  if (p.transferType !== "in") return json({ success: true, ignored: "not_in" });
+  if (p.accountNumber && donateConfig.accountNumber && p.accountNumber !== donateConfig.accountNumber) {
+    return json({ success: true, ignored: "other_account" });
+  }
+  const amount = p.transferAmount;
+  if (p.id == null || typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) return json({ success: false }, 400);
+
+  try {
+    const { data, error } = await adminClient().rpc("process_bank_tx", {
+      p_tx_id: `sepay:${p.id}`,
+      p_amount: Math.round(amount),
+      p_content: `${p.content ?? ""} ${p.code ?? ""}`.trim(),
+      p_raw: p,
+    });
+    if (error) throw error;
+    return json({ success: true, result: data });
+  } catch (e) {
+    await reportError(e, { source: "server", path: "/api/webhooks/sepay", method: "POST" });
+    return json({ success: false }, 500); // 5xx để SePay tự gọi lại; idempotent nên không sợ trùng
+  }
 }
 
 
@@ -327,6 +587,7 @@ import { notFound } from "next/navigation";
 import { site } from "@/data/site";
 import { donateConfig } from "@/data/donate";
 import DonateCard from "@/components/DonateCard";
+import PayDonate from "@/components/PayDonate";
 
 export const metadata: Metadata = {
   title: "Donate — Ủng hộ " + site.name,
@@ -345,6 +606,8 @@ export default function DonatePage() {
         </h1>
         {donateConfig.subtitle && <p className="mt-3 text-base text-haze sm:text-lg">{donateConfig.subtitle}</p>}
       </div>
+      {/* QR tự động theo từng đơn; DonateCard bên dưới là QR tĩnh dự phòng */}
+      <PayDonate />
       <DonateCard cfg={donateConfig} />
     </main>
   );
@@ -403,6 +666,7 @@ import Cover from "@/components/Cover";
 import DownloadPanel from "@/components/DownloadPanel";
 import EngineChip from "@/components/EngineChip";
 import FavoriteButton from "@/components/FavoriteButton";
+import BuyKeyButton from "@/components/BuyKeyButton";
 import ViewTracker from "@/components/ViewTracker";
 import ExpandableContent from "@/components/ExpandableContent";
 import { AdultChip, PatchChip } from "@/components/GameBadges";
@@ -513,6 +777,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <DownloadPanel slug={game.slug} title={game.title} hasLinks={game.links.some((l) => /^https?:\/\//i.test(l.url))} />
             <FavoriteButton slug={game.slug} variant="pill" />
+            <BuyKeyButton slug={game.slug} />
             <ReportMenu variant="pill" game={game.title} />
             {game.images.length > 0 && (
               <a href="#hinh-anh" className="glass rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15">
@@ -567,6 +832,18 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
 }
 
 
+=== FILE: src/app/gio-hang/page.tsx ===
+
+import type { Metadata } from "next";
+import CartPage from "@/components/CartPage";
+
+export const metadata: Metadata = { title: "Giỏ hàng", robots: { index: false, follow: false } };
+
+export default function Page() {
+  return <CartPage />;
+}
+
+
 === FILE: src/app/global-error.tsx ===
 
 "use client";
@@ -609,8 +886,8 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
   --color-plum: #1a1530;
   --color-haze: #94a3b8;
   --color-mist: #efeaff;
-  --color-berry: #ff2e93;
-  --color-neon: #2af5d6;
+  --color-berry: #ee5a96;
+  --color-neon: #5eead4;
   /* màu nhấn theo từng game: đặt --accent/--accent2/--on-accent trên khối bọc (xem accentStyle trong game-ui.ts) */
   --color-accent: var(--accent);
   --color-accent2: var(--accent2);
@@ -621,7 +898,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
 
 /* Giữ chỗ thanh cuộn: mở hộp thoại (khóa cuộn) không làm cả trang giật sang phải */
 html { scrollbar-gutter: stable; }
-:root { color-scheme: dark; --accent: #ff2e93; --accent2: #b537f2; --on-accent: #0f0c1a; }
+:root { color-scheme: dark; --accent: #ee5a96; --accent2: #9d6bf0; --on-accent: #0f0c1a; }
 
 body {
   background-color: var(--color-ink);
@@ -632,7 +909,7 @@ body {
 html::before {
   content: ""; position: fixed; inset: 0 0 auto 0; height: 100vh; height: 100lvh; z-index: -1; pointer-events: none;
   background-image:
-    radial-gradient(ellipse 50% 80% at 50% 40%, rgba(124, 22, 78, 0.22), transparent),
+    radial-gradient(ellipse 50% 80% at 50% 40%, rgba(100, 34, 80, 0.22), transparent),
     linear-gradient(rgba(139, 92, 246, 0.07) 1px, transparent 1px),
     linear-gradient(90deg, rgba(139, 92, 246, 0.07) 1px, transparent 1px);
   background-size: 100% 100%, 36px 36px, 36px 36px;
@@ -644,9 +921,9 @@ html::before {
 body::before {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background-image:
-    radial-gradient(60rem 38rem at 88% -8%, rgba(255, 46, 147, 0.13), transparent 62%),
-    radial-gradient(52rem 40rem at -8% 6%, rgba(181, 55, 242, 0.16), transparent 62%),
-    radial-gradient(46rem 34rem at 52% 108%, rgba(42, 245, 214, 0.07), transparent 62%);
+    radial-gradient(60rem 38rem at 88% -8%, rgba(238, 90, 150, 0.13), transparent 62%),
+    radial-gradient(52rem 40rem at -8% 6%, rgba(157, 107, 240, 0.16), transparent 62%),
+    radial-gradient(46rem 34rem at 52% 108%, rgba(94, 234, 212, 0.07), transparent 62%);
 }
 
 ::selection { background: var(--color-berry); color: var(--color-ink); }
@@ -698,7 +975,7 @@ html[data-dl-open] #site-header > * { pointer-events: auto; }
 .neon-title { display: flex; align-items: center; gap: 0.75rem; }
 .neon-title::before {
   content: ""; flex: none; width: 4px; height: 1.1em; border-radius: 9999px;
-  background: linear-gradient(180deg, #2af5d6, #ff2e93); box-shadow: 0 0 12px rgba(42, 245, 214, 0.5);
+  background: linear-gradient(180deg, #5eead4, #ee5a96); box-shadow: 0 0 12px rgba(94, 234, 212, 0.5);
 }
 
 /* ---------- Hiệu ứng chuyển (chỉ opacity + transform: chạy trên GPU, không bắt trình duyệt tính lại bố cục) ---------- */
@@ -734,6 +1011,7 @@ import ReloadReset from "@/components/ReloadReset";
 import ClientErrorReporter from "@/components/ClientErrorReporter";
 import FavSync from "@/components/FavSync";
 import NotificationBell from "@/components/NotificationBell";
+import CartButton from "@/components/CartButton";
 import OnlineCount from "@/components/OnlineCount";
 import PopupNotice from "@/components/PopupNotice";
 import PageTransition from "@/components/PageTransition";
@@ -780,7 +1058,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <>
               {donateConfig.enabled && (
                 <Link href="/donate" aria-label={donateNavLabel} title={donateNavLabel}
-                      className="grid size-10 place-items-center rounded-full text-berry transition hover:bg-white/10 md:hidden">
+                      className="grid size-9 place-items-center rounded-full text-berry transition hover:bg-white/10 max-[399px]:hidden sm:size-10 md:hidden">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2Z" />
                   </svg>
@@ -794,6 +1072,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   {site.nav.discord}
                 </a>
               )}
+              <CartButton />
               <NotificationBell notice={notice} items={latest} />
               <div className="relative">
                 <AccountMenu />
@@ -937,6 +1216,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
 }
 
 
+=== FILE: src/app/tai-khoan/key/page.tsx ===
+
+import type { Metadata } from "next";
+import KeyVault from "@/components/KeyVault";
+
+export const metadata: Metadata = { title: "Key đã mua", robots: { index: false, follow: false } };
+
+export default function Page() {
+  return <KeyVault />;
+}
+
+
 === FILE: src/app/template.tsx ===
 
 // template (khác layout) được dựng lại mỗi lần đổi trang, nên class anim-page chạy lại và tạo hiệu ứng "vào trang".
@@ -949,11 +1240,17 @@ export default function Template({ children }: { children: React.ReactNode }) {
 
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { authConfigured, getSupabase } from "@/lib/supabase";
 import { displayName, useAuthUser } from "@/lib/auth-store";
+import { donateConfig, donateNavLabel } from "@/data/donate";
+import { useList } from "@/lib/user-lists";
+import { softNav } from "@/lib/soft-nav";
 
+const num = "rounded-full bg-white/10 px-2 py-0.5 text-xs tabular-nums text-haze";
 const item = "block w-full rounded-xl px-3 py-2 text-left text-sm text-mist/90 transition hover:bg-white/10";
+const itemRow = item.replace("block", "flex items-center justify-between");
 
 // Cạnh nút Tìm kiếm trên header. Chưa đăng nhập: nút 3 gạch, bấm ra Đăng nhập / Đăng ký.
 // Đã đăng nhập: chữ cái đầu + tên, bấm ra menu Đăng xuất. Chưa cấu hình Supabase thì không hiện gì (web chạy như cũ).
@@ -961,6 +1258,9 @@ export default function AccountMenu() {
   const user = useAuthUser();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const fav = useList("fav").length;
+  const seen = useList("seen").length;
 
   useEffect(() => {
     if (!open) return;
@@ -973,7 +1273,7 @@ export default function AccountMenu() {
 
   if (!authConfigured) return null;
   // Chưa biết trạng thái: giữ chỗ để header không giật khi hydrate xong
-  if (user === undefined) return <span aria-hidden className="h-10 w-10 sm:w-[7.5rem]" />;
+  if (user === undefined) return <span aria-hidden className="h-9 w-9 sm:h-10 sm:w-[7.5rem]" />;
 
   const name = user ? displayName(user) : "";
 
@@ -981,7 +1281,7 @@ export default function AccountMenu() {
     <div ref={ref} className="relative">
       {user ? (
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label={`Tài khoản ${name}`}
-                className="flex h-10 items-center gap-2 rounded-full bg-white/10 pl-1.5 pr-3 text-sm transition hover:bg-white/[0.16] sm:pr-4">
+                className="flex h-9 items-center gap-2 rounded-full bg-white/10 pl-1 pr-1 text-sm transition hover:bg-white/[0.16] sm:h-10 sm:pl-1.5 sm:pr-4">
           <span aria-hidden className="grid size-7 place-items-center rounded-full bg-gradient-to-br from-berry to-[#7c5cff] text-xs font-bold uppercase text-ink">
             {name.slice(0, 1)}
           </span>
@@ -989,7 +1289,7 @@ export default function AccountMenu() {
         </button>
       ) : (
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label="Menu tài khoản"
-                className="grid size-10 place-items-center rounded-full bg-[linear-gradient(135deg,#2af5d6,#ff2e93)] p-[2px] transition active:scale-95">
+                className="grid size-9 place-items-center rounded-full bg-[linear-gradient(135deg,#5eead4,#ee5a96)] p-[2px] transition active:scale-95 sm:size-10">
           <span className="grid size-full place-items-center rounded-full bg-[#14102b]"><svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
             {open ? <path d="m5 5 10 10M15 5 5 15" /> : <><circle cx="10" cy="7" r="3.2" /><path d="M3.5 17c.8-3.3 3.3-5 6.5-5s5.7 1.7 6.5 5" /></>}
           </svg></span>
@@ -997,10 +1297,22 @@ export default function AccountMenu() {
       )}
 
       {open && (
-        <div role="menu" className="anim-pop absolute right-0 top-12 z-50 w-56 rounded-2xl border border-white/10 bg-plum p-2 shadow-2xl shadow-black/50">
+        <div role="menu" className="anim-pop absolute right-0 top-12 z-50 w-60 rounded-2xl border border-white/10 bg-plum p-2 shadow-2xl shadow-black/50">
           {user ? (
             <>
               <p className="truncate px-3 py-2 text-sm font-semibold">{name}</p>
+              <div className="my-1 border-t border-white/10" />
+              {([["fav", "Yêu thích", fav], ["seen", "Đã xem", seen]] as const).map(([k, label, n]) => (
+                <Link key={k} href={`/?list=${k}#kho-game`} role="menuitem"
+                      onClick={(e) => { setOpen(false); softNav(e, pathname, `?list=${k}`, "library"); }}
+                      className={itemRow}>
+                  <span className="flex items-center gap-2"><span aria-hidden className={k === "fav" ? "text-red-500" : "text-sky-400"}>{k === "fav" ? "♥" : "●"}</span>{label}</span><span className={num}>{n}</span>
+                </Link>
+              ))}
+              <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>
+              <Link href="/gio-hang" role="menuitem" onClick={() => setOpen(false)} className={item}>Giỏ hàng</Link>
+              {donateConfig.enabled && <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>}
+              <div className="my-1 border-t border-white/10" />
               <button type="button" role="menuitem" className={item}
                       onClick={() => { setOpen(false); void getSupabase()?.auth.signOut(); }}>
                 Đăng xuất
@@ -1010,6 +1322,17 @@ export default function AccountMenu() {
             <>
               <Link href="/dang-nhap" role="menuitem" onClick={() => setOpen(false)} className={item}>Đăng nhập</Link>
               <Link href="/dang-ky" role="menuitem" onClick={() => setOpen(false)} className={item}>Đăng ký</Link>
+              <div className="my-1 border-t border-white/10" />
+              {([["fav", "Yêu thích", fav], ["seen", "Đã xem", seen]] as const).map(([k, label, n]) => (
+                <Link key={k} href={`/?list=${k}#kho-game`} role="menuitem"
+                      onClick={(e) => { setOpen(false); softNav(e, pathname, `?list=${k}`, "library"); }}
+                      className={itemRow}>
+                  <span className="flex items-center gap-2"><span aria-hidden className={k === "fav" ? "text-red-500" : "text-sky-400"}>{k === "fav" ? "♥" : "●"}</span>{label}</span><span className={num}>{n}</span>
+                </Link>
+              ))}
+              <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>
+              <Link href="/gio-hang" role="menuitem" onClick={() => setOpen(false)} className={item}>Giỏ hàng</Link>
+              {donateConfig.enabled && <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>}
             </>
           )}
         </div>
@@ -1311,7 +1634,7 @@ export default function AgeGate() {
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <button type="button" onClick={accept} disabled={!agreed}
-                      className="rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:translate-y-0 sm:flex-1">
+                      className="rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:translate-y-0 sm:flex-1">
                 Vào {site.name}
               </button>
               <a href="https://www.google.com"
@@ -1717,7 +2040,7 @@ export default function Turnstile({ onToken, resetKey = 0 }: { onToken: (t: stri
 export const fieldCls =
   "w-full rounded-2xl bg-white/[0.07] px-5 py-4 text-base outline-none ring-1 ring-white/10 placeholder:text-haze focus:bg-white/10 focus-visible:ring-2 focus-visible:ring-berry";
 export const btnCls =
-  "w-full rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:translate-y-0";
+  "w-full rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:translate-y-0";
 export const linkCls = "font-medium text-berry transition hover:underline";
 
 
@@ -1763,22 +2086,395 @@ import { site } from "@/data/site";
 export default function Brand({ sub }: { sub?: string }) {
   const [white, cyan] = (sub ?? "").split("·").map((s) => s.trim());
   return (
-    <HomeLink aria-label={site.name} className="group flex shrink-0 items-center gap-3">
+    <HomeLink aria-label={site.name} className="group flex shrink-0 items-center gap-2 sm:gap-3">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo-gsvh.svg" alt="" width={45} height={48} className="h-12 w-[45px] shrink-0 transition duration-300 group-hover:scale-105" />
-      <span className="flex flex-col leading-none">
-        <span className="font-[family-name:var(--font-orbitron)] text-2xl font-extrabold uppercase tracking-[0.06em]">
+      <img src="/logo-gsvh.svg" alt="" width={45} height={48} className="h-10 w-[38px] shrink-0 sm:h-12 sm:w-[45px] transition duration-300 group-hover:scale-105" />
+      <span className="flex flex-col leading-none max-[339px]:hidden">
+        <span className="font-[family-name:var(--font-orbitron)] text-xl font-extrabold sm:text-2xl uppercase tracking-[0.06em]">
           <span className="text-white">{site.name.slice(0, 2)}</span>
-          <span className="bg-[linear-gradient(90deg,#ff47b6_0%,#b537f2_45%,#2af5d6_100%)] bg-clip-text text-transparent">{site.name.slice(2)}</span>
+          <span className="bg-[linear-gradient(90deg,#ff47b6_0%,#9d6bf0_45%,#5eead4_100%)] bg-clip-text text-transparent">{site.name.slice(2)}</span>
         </span>
         {white && (
           <span className="mt-1.5 whitespace-nowrap font-[family-name:var(--font-barlow)] text-xs font-semibold uppercase tracking-[0.12em]">
             <span className="text-white">{white}</span>
-            {cyan && <span className="ml-1.5 text-[#2af5d6]">{cyan}</span>}
+            {cyan && <span className="ml-1.5 text-[#5eead4]">{cyan}</span>}
           </span>
         )}
       </span>
     </HomeLink>
+  );
+}
+
+
+=== FILE: src/components/BuyKeyButton.tsx ===
+
+"use client";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { addToCart, useCart } from "@/lib/cart";
+import { loadKeyPrices } from "@/lib/key-prices";
+
+// Nút "Mua key" ở trang game: chỉ hiện khi game có bán key. Bấm = thêm vào giỏ và sang trang giỏ hàng.
+export default function BuyKeyButton({ slug }: { slug: string }) {
+  const router = useRouter();
+  const cart = useCart();
+  const [price, setPrice] = useState<number | null | undefined>(undefined); // undefined = đang tải | null = không bán key
+  useEffect(() => {
+    let dead = false;
+    loadKeyPrices().then((m) => { if (!dead) setPrice(m.has(slug) ? m.get(slug)! : null); }, () => { if (!dead) setPrice(null); });
+    return () => { dead = true; };
+  }, [slug]);
+
+  if (!price) return null;
+  const inCart = cart.includes(slug);
+  return (
+    <button type="button" onClick={() => { addToCart(slug); router.push("/gio-hang"); }}
+            className="glass inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15 active:scale-95">
+      <svg viewBox="0 0 24 24" className="size-5 text-berry" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" /><path d="M2.5 3.5h2.7l2.3 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 7.5H6" />
+      </svg>
+      {inCart ? "Xem giỏ hàng" : `Mua key · ${price.toLocaleString("vi-VN")}đ`}
+    </button>
+  );
+}
+
+
+=== FILE: src/components/CartButton.tsx ===
+
+"use client";
+import Link from "next/link";
+import { useCart } from "@/lib/cart";
+
+// Nút giỏ hàng trên header: bấm là sang trang /gio-hang (trang riêng, rộng rãi).
+export default function CartButton() {
+  const cart = useCart();
+  return (
+    <Link href="/gio-hang" aria-label={`Giỏ hàng${cart.length ? `, ${cart.length} game` : ""}`}
+          className="relative grid size-9 place-items-center rounded-full bg-white/10 transition hover:bg-white/[0.16] active:scale-95 sm:size-10">
+      <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" /><path d="M2.5 3.5h2.7l2.3 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 7.5H6" />
+      </svg>
+      {cart.length > 0 && <span className="absolute -right-0.5 -top-0.5 grid min-w-[1.1rem] place-items-center rounded-full bg-berry px-1 text-[10px] font-bold leading-[1.1rem] text-ink">{cart.length}</span>}
+    </Link>
+  );
+}
+
+
+=== FILE: src/components/CartPage.tsx ===
+
+"use client";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { site } from "@/data/site";
+import { getSupabase } from "@/lib/supabase";
+import { clearCart, rememberOrder, removeFromCart, useCart, usePastOrders } from "@/lib/cart";
+import { loadKeyRows, type Price } from "@/lib/key-prices";
+import { useGameMeta } from "@/lib/game-meta";
+
+type Order = { code: string; token: string; amount: number; suffix: number; subtotal: number; expiresAt: string; qr: string; bank: { bankName: string; accountNumber: string; accountHolder: string } };
+type Key = { slug: string; title: string; password: string };
+type Status = "pending" | "paid" | "underpaid" | "expired";
+
+const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ";
+const FB = /^https?:\/\//i.test(site.facebook) ? site.facebook : "";
+const TTL = 30 * 60; // khớp ORDER_TTL_MIN ở src/lib/payment.ts
+const ACTIVE = "gsvh-active-order"; // giữ đơn đang chờ khi tải lại trang (sessionStorage, mất khi đóng tab)
+const saveActive = (o: Order | null) => { try { if (o) sessionStorage.setItem(ACTIVE, JSON.stringify(o)); else sessionStorage.removeItem(ACTIVE); } catch { /* bỏ qua */ } };
+
+const Cart = ({ cls = "size-5" }: { cls?: string }) => (
+  <svg viewBox="0 0 24 24" className={cls} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" /><path d="M2.5 3.5h2.7l2.3 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 7.5H6" />
+  </svg>
+);
+const cp = "shrink-0 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold transition hover:bg-white/20 active:scale-95";
+const primary = "flex w-full items-center justify-center gap-2 rounded-full bg-berry px-7 py-4 text-base font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50";
+const ghost = "w-full rounded-full bg-white/10 px-6 py-3 text-sm font-semibold transition hover:bg-white/20 active:scale-95";
+
+export default function CartPage() {
+  const cart = useCart();
+  const past = usePastOrders();
+  const meta = useGameMeta();
+  const titleOf = (s: string) => meta.get(s)?.title ?? s;
+  const thumbOf = (s: string) => meta.get(s)?.thumb ?? "";
+  const [prices, setPrices] = useState<Map<string, Price> | null>(null);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [status, setStatus] = useState<Status>("pending");
+  const [paid, setPaid] = useState<number | null>(null);
+  const [keys, setKeys] = useState<Key[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [left, setLeft] = useState(0);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  useEffect(() => {
+    let dead = false;
+    loadKeyRows().then((r) => { if (!dead) setPrices(new Map(r.map((x) => [x.slug, x]))); }, () => { if (!dead) { setPrices(new Map()); setErr("Không tải được giá. Thử lại sau ít phút."); } });
+    return () => { dead = true; };
+  }, []);
+
+  // Tải lại trang giữa lúc đang chờ chuyển khoản: khôi phục QR (nếu đơn chưa hết hạn).
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(ACTIVE);
+      const o = raw ? JSON.parse(raw) as Order : null;
+      if (o && Date.parse(o.expiresAt) > Date.now()) setOrder(o);
+    } catch { /* bỏ qua */ }
+  }, []);
+
+  const lines = cart.map((slug) => ({ slug, p: prices?.get(slug) }));
+  const total = lines.reduce((s, l) => s + (l.p ? l.p.price + l.p.fee : 0), 0);
+  const missing = !!prices && lines.some((l) => !l.p);
+
+  const checkout = async () => {
+    if (busy || cart.length === 0) return;
+    setBusy(true); setErr(null);
+    try {
+      const token = (await getSupabase()?.auth.getSession())?.data.session?.access_token;
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ slugs: cart }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErr(body.code === "unavailable" ? "Có game trong giỏ đã ngừng bán key. Hãy xóa nó khỏi giỏ." :
+          body.code === "rate" ? "Bạn thao tác quá nhanh, đợi một lúc rồi thử lại." :
+          body.code === "busy" ? "Hệ thống đang bận, thử lại sau vài giây." : "Không tạo được đơn. Thử lại sau ít phút.");
+        return;
+      }
+      rememberOrder({ code: body.code, token: body.token });
+      saveActive(body as Order);
+      setOrder(body as Order); setStatus("pending"); setPaid(null); setKeys([]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch { setErr("Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại."); }
+    finally { setBusy(false); }
+  };
+
+  const reset = useCallback(() => { setOrder(null); setStatus("pending"); setPaid(null); setKeys([]); setErr(null); saveActive(null); }, []);
+
+  // Hỏi trạng thái mỗi 3 giây khi đang chờ; paid thì nhận key và dọn giỏ.
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!order || status === "paid" || status === "expired") return;
+    let dead = false;
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/orders/${order.code}?t=${order.token}`, { cache: "no-store" });
+        if (r.ok) {
+          const d = await r.json() as { status: Status; paidAmount: number | null; keys?: Key[] };
+          if (dead) return;
+          setStatus(d.status); setPaid(d.paidAmount);
+          if (d.status === "paid") { setKeys(d.keys ?? []); clearCart(); saveActive(null); return; }
+          if (d.status === "expired") return;
+        }
+      } catch { /* chập chờn mạng: nhịp sau thử lại */ }
+      if (!dead) timer.current = setTimeout(tick, 3000);
+    };
+    timer.current = setTimeout(tick, 1500);
+    return () => { dead = true; if (timer.current) clearTimeout(timer.current); };
+  }, [order, status]);
+
+  useEffect(() => {
+    if (!order || status === "paid") return;
+    const upd = () => setLeft(Math.max(0, Math.floor((Date.parse(order.expiresAt) - Date.now()) / 1000)));
+    upd();
+    const t = setInterval(upd, 1000);
+    return () => clearInterval(t);
+  }, [order, status]);
+
+  const copy = async (k: string, v: string) => {
+    try { await navigator.clipboard.writeText(v); setCopied(k); setTimeout(() => setCopied(null), 1500); }
+    catch { window.prompt("Sao chép (Ctrl+C):", v); }
+  };
+
+  const expired = !!order && (status === "expired" || left === 0);
+  const step = !order ? 0 : status === "paid" ? 2 : 1;
+
+  const help = (
+    <>
+      {FB && (
+        <a href={FB} target="_blank" rel="noopener noreferrer"
+           className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-left text-sm transition hover:bg-white/[0.09]">
+          <span><b className="block">Chuyển xong mà không nhận được pass?</b>
+            <span className="text-xs text-haze">Nhắn Facebook{order ? <> kèm mã đơn <span className="font-mono">{order.code}</span></> : null}, mình xử lý ngay.</span></span>
+          <span aria-hidden className="text-lg text-berry">&rarr;</span>
+        </a>
+      )}
+    </>
+  );
+
+  const thumb = (slug: string, cls: string) => thumbOf(slug)
+    // eslint-disable-next-line @next/next/no-img-element
+    ? <img src={thumbOf(slug)} alt="" loading="lazy" className={`${cls} object-cover`} />
+    : <span className={`${cls} grid place-items-center bg-white/10 font-display text-2xl font-bold text-white/40`}>{titleOf(slug).slice(0, 1)}</span>;
+
+  return (
+    <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-8 sm:pt-12">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-berry">Giỏ hàng</p>
+      <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight text-balance sm:text-6xl">
+        {step === 2 ? "Thanh toán thành công." : step === 1 ? "Chuyển khoản." : cart.length === 0 ? "Giỏ hàng đang trống." : "Giỏ hàng của bạn."}
+      </h1>
+
+      <ol aria-label="Các bước" className="mt-8 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider sm:max-w-xl">
+        {["Giỏ hàng", "Chuyển khoản", "Nhận key"].map((s, i) => (
+          <li key={s} className="flex flex-1 flex-col gap-2">
+            <span className={`h-1.5 rounded-full transition-colors duration-500 ${i <= step ? "bg-gradient-to-r from-[#5eead4] to-[#ee5a96]" : "bg-white/10"}`} />
+            <span className={i <= step ? "text-mist" : "text-haze/70"}>{s}</span>
+          </li>
+        ))}
+      </ol>
+
+      {/* ---------- BƯỚC 3: đã thanh toán ---------- */}
+      {order && status === "paid" && (
+        <section role="status" className="mt-10 grid gap-6 lg:grid-cols-[1fr_24rem]">
+          <div className="space-y-3">
+            {keys.length === 0 ? <p className="glass rounded-3xl px-6 py-10 text-center text-haze">Đang chuẩn bị key…</p> : keys.map((k) => (
+              <div key={k.slug} className="anim-pop flex overflow-hidden rounded-3xl border border-white/10 bg-white/[0.05]">
+                {thumb(k.slug, "aspect-video w-32 shrink-0 sm:w-56")}
+                <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-4">
+                  <p className="font-display text-lg font-bold leading-snug sm:text-xl">{k.title}</p>
+                  <p className="text-sm text-emerald-300">Key đã sẵn sàng</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <aside className="h-fit space-y-3 rounded-3xl border border-emerald-400/25 bg-emerald-500/10 p-6 text-center">
+            <span className="mx-auto grid size-16 place-items-center rounded-full bg-emerald-500/20 text-emerald-300">
+              <svg viewBox="0 0 24 24" className="size-9" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m5.5 12.5 4.2 4.2 8.8-9.2" /></svg>
+            </span>
+            <p className="font-display text-2xl font-bold">Đã thanh toán</p>
+            <p className="text-sm text-haze">Đã nhận <b className="text-mist">{fmt(paid ?? order.amount)}</b> · đơn <span className="font-mono">{order.code}</span></p>
+            <Link href={`/tai-khoan/key?order=${order.code}`} onClick={reset} className={primary}>Hiện key</Link>
+            {keys.length === 0 && help}
+          </aside>
+        </section>
+      )}
+
+      {/* ---------- BƯỚC 2: chuyển khoản ---------- */}
+      {order && status !== "paid" && (
+        <section className="mt-10 grid gap-6 lg:grid-cols-2">
+          <div className="rounded-3xl border border-white/10 bg-ink/40 p-6 text-center sm:p-8">
+            <p className="text-xs uppercase tracking-wider text-haze">Số tiền chính xác</p>
+            <button type="button" onClick={() => copy("amt", String(order.amount))} title="Bấm để chép số tiền"
+                    className="mt-2 inline-flex flex-wrap items-center justify-center gap-3 font-display text-5xl font-extrabold tabular-nums tracking-tight transition active:scale-95 sm:text-6xl">
+              <span className="bg-gradient-to-r from-[#5eead4] to-[#ee5a96] bg-clip-text text-transparent">{order.amount.toLocaleString("vi-VN")}đ</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 font-sans text-xs font-semibold text-mist">{copied === "amt" ? "Đã chép" : "Chép"}</span>
+            </button>
+            <div className="relative mx-auto mt-6 w-fit rounded-3xl bg-white p-4 shadow-xl shadow-black/40">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={order.qr} alt={`Mã QR thanh toán ${fmt(order.amount)}`} className={`size-64 object-contain sm:size-80 ${expired ? "opacity-20" : ""}`} />
+              {expired && <div className="absolute inset-0 grid place-items-center text-base font-semibold text-neutral-700">Mã đã hết hạn</div>}
+            </div>
+            <div className="mx-auto mt-6 h-2 w-full max-w-xs overflow-hidden rounded-full bg-white/10" aria-hidden>
+              <div className="h-full rounded-full bg-gradient-to-r from-[#5eead4] to-[#ee5a96] transition-[width] duration-1000 ease-linear" style={{ width: `${Math.min(100, (left / TTL) * 100)}%` }} />
+            </div>
+            <p role="status" aria-live="polite" className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm text-haze">
+              {expired ? "Đơn hết hạn. Nếu đã chuyển tiền, hệ thống vẫn ghi nhận." :
+                status === "underpaid" ? `Đã nhận ${fmt(paid ?? 0)}, còn thiếu ${fmt(order.amount - (paid ?? 0))}. Chuyển bù đúng số còn thiếu.` :
+                <><span aria-hidden className="size-2 animate-pulse rounded-full bg-[#5eead4]" />Đang chờ ngân hàng xác nhận · còn <b className="tabular-nums text-mist">{Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</b></>}
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <dl className="divide-y divide-white/10 rounded-3xl border border-white/10 bg-white/[0.04] px-5 text-sm sm:text-base">
+              {([
+                ["Ngân hàng", order.bank.bankName, null],
+                ["Số tài khoản", order.bank.accountNumber, "acc"],
+                ["Chủ tài khoản", order.bank.accountHolder, null],
+                ["Nội dung", order.code, "code"],
+              ] as const).map(([label, value, k]) => (
+                <div key={label} className="flex items-center justify-between gap-3 py-3.5">
+                  <dt className="text-haze">{label}</dt>
+                  <dd className="flex items-center gap-2 font-display font-bold tabular-nums">
+                    <span className="break-all text-right">{value}</span>
+                    {k && <button type="button" onClick={() => copy(k, value)} className={cp}>{copied === k ? "Đã chép" : "Chép"}</button>}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+
+            <ol className="space-y-2 rounded-3xl border border-white/10 bg-white/[0.04] p-5 text-sm text-haze">
+              {["Mở app ngân hàng hoặc MoMo, quét QR hoặc nhập thông tin ở trên.", "Chuyển đúng số tiền và giữ nguyên nội dung.", "Giữ trang này mở: 5–30 giây sau, bước Nhận key sẽ tự hiện."].map((s, i) => (
+                <li key={s} className="flex gap-3"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-white/10 text-xs font-bold text-mist">{i + 1}</span><span className="pt-0.5">{s}</span></li>
+              ))}
+            </ol>
+
+            <p className="rounded-2xl bg-amber-500/10 px-4 py-3 text-xs leading-relaxed text-amber-200 sm:text-sm">
+              <b>Chuyển đúng từng đồng:</b> mỗi đơn có số tiền riêng (+{order.suffix}đ nhận diện) để hệ thống nhận đúng đơn dù app ngân hàng/MoMo làm mất nội dung.
+            </p>
+
+            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wider text-haze">Trong đơn</p>
+              <ul className="space-y-2">
+                {cart.map((s) => (
+                  <li key={s} className="flex items-center gap-3">{thumb(s, "size-11 shrink-0 rounded-xl")}<span className="min-w-0 flex-1 text-sm font-semibold leading-snug">{titleOf(s)}</span></li>
+                ))}
+                {cart.length === 0 && <li className="px-1 text-sm text-haze">{fmt(order.subtotal)}</li>}
+              </ul>
+            </div>
+
+            {help}
+            <button type="button" onClick={reset} className={ghost}>{expired ? "Quay lại giỏ" : "Hủy, quay lại giỏ"}</button>
+          </div>
+        </section>
+      )}
+
+      {/* ---------- BƯỚC 1: giỏ hàng ---------- */}
+      {!order && cart.length === 0 && (
+        <section className="mt-10 rounded-3xl border border-dashed border-white/15 px-6 py-16 text-center sm:py-24">
+          <span className="mx-auto grid size-20 place-items-center rounded-full bg-white/[0.06] text-haze"><Cart cls="size-9" /></span>
+          <p className="mx-auto mt-6 max-w-[40ch] text-lg text-haze">Vào trang một game, bấm &ldquo;Mua key&rdquo;, rồi tiếp tục chọn các game khác.</p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link href="/#kho-game" className="rounded-full bg-berry px-8 py-3.5 font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95">Chọn game</Link>
+            <Link href="/tai-khoan/key" className="rounded-full bg-white/10 px-8 py-3.5 font-semibold transition hover:bg-white/20 active:scale-95">
+              Xem key đã mua{past.length > 0 ? ` (${past.length} đơn)` : ""}
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {!order && cart.length > 0 && (
+        <section className="mt-10 grid gap-6 lg:grid-cols-[1fr_24rem] lg:items-start">
+          <ul className="space-y-4">
+            {lines.map(({ slug, p }) => (
+              <li key={slug} className="anim-pop flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.05] sm:flex-row">
+                {thumb(slug, "aspect-video w-full shrink-0 sm:aspect-auto sm:w-60")}
+                <div className="flex min-w-0 flex-1 flex-col justify-between gap-4 p-5">
+                  <div>
+                    <Link href={`/game/${slug}`} className="font-display text-xl font-bold leading-snug transition hover:text-berry sm:text-2xl">{titleOf(slug)}</Link>
+                    <p className="mt-1 text-sm text-haze">{!p ? (prices ? "Ngừng bán key" : "Đang tải giá…") : p.fee > 0 ? `Key ${fmt(p.price)} + phí ${fmt(p.fee)}` : "Key mật khẩu ZIP"}</p>
+                  </div>
+                  <div className="flex items-end justify-between gap-3">
+                    <button type="button" onClick={() => removeFromCart(slug)} className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold transition hover:bg-red-500/30 active:scale-95">Xóa</button>
+                    <span className="font-display text-2xl font-extrabold tabular-nums">{p ? fmt(p.price + p.fee) : "–"}</span>
+                  </div>
+                </div>
+              </li>
+            ))}
+            <li><Link href="/#kho-game" className="inline-block text-sm text-haze underline decoration-white/20 underline-offset-4 transition hover:text-mist">+ Chọn thêm game khác</Link></li>
+          </ul>
+
+          <aside className="glass space-y-4 rounded-3xl p-6 lg:sticky lg:top-24">
+            <h2 className="font-display text-xl font-bold">Tóm tắt đơn</h2>
+            <dl className="space-y-2 text-sm">
+              <div className="flex justify-between"><dt className="text-haze">Số game</dt><dd className="font-semibold">{cart.length}</dd></div>
+              <div className="flex items-baseline justify-between border-t border-white/10 pt-3"><dt className="text-haze">Tạm tính</dt><dd className="font-display text-3xl font-extrabold tabular-nums">{fmt(total)}</dd></div>
+            </dl>
+            {err && <p role="alert" className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{err}</p>}
+            <button type="button" onClick={checkout} disabled={busy || missing || !prices || prices.size === 0} className={primary}>
+              {busy ? "Đang tạo mã QR…" : `Thanh toán ${fmt(total)}`}
+            </button>
+            <ul className="space-y-1.5 text-xs text-haze">
+              <li>• Chuyển khoản MB/MoMo, quét QR là xong.</li>
+              <li>• Key hiện ngay sau khi nhận tiền (5–30 giây).</li>
+              <li>• Xem lại key ở menu tài khoản &rsaquo; Key đã mua.</li>
+            </ul>
+            {past.length > 0 && <Link href="/tai-khoan/key" className="block text-center text-sm text-haze underline decoration-white/20 underline-offset-4 transition hover:text-mist">Key đã mua ({past.length} đơn)</Link>}
+            {FB && <a href={FB} target="_blank" rel="noopener noreferrer" className="block text-center text-xs text-haze underline decoration-white/20 underline-offset-4 transition hover:text-mist">Không nhận được pass? Nhắn Facebook</a>}
+          </aside>
+        </section>
+      )}
+    </main>
   );
 }
 
@@ -1974,7 +2670,7 @@ export default function DonateCard({ cfg }: { cfg: DonateConfig }) {
           onClick={saveQr}
           disabled={!activeQrSrc}
           title={activeQrSrc ? undefined : "Chưa có ảnh mã QR"}
-          className="inline-flex items-center gap-2 rounded-xl bg-berry px-6 py-3 text-sm font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+          className="inline-flex items-center gap-2 rounded-xl bg-berry px-6 py-3 text-sm font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M12 3v12" />
@@ -2243,14 +2939,14 @@ export default function FavoriteButton({ slug, variant = "card" }: { slug: strin
   if (variant === "pill") {
     return (
       <button type="button" onClick={() => toggleFav(slug)} aria-pressed={on}
-              className={`glass inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15 active:scale-95 ${on ? "text-berry" : ""}`}>
+              className={`glass inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold transition duration-300 hover:-translate-y-0.5 hover:bg-white/15 active:scale-95 ${on ? "text-red-500" : ""}`}>
         {heart}{on ? "Đã yêu thích" : "Yêu thích"}
       </button>
     );
   }
   return (
     <button type="button" onClick={() => toggleFav(slug)} aria-pressed={on} aria-label={label} title={label}
-            className={`glass grid size-9 place-items-center rounded-full transition active:scale-90 hover:bg-white/20 ${on ? "text-berry" : "text-white"}`}>
+            className={`glass grid size-9 place-items-center rounded-full transition active:scale-90 hover:bg-white/20 ${on ? "text-red-500" : "text-white"}`}>
       {heart}
     </button>
   );
@@ -2598,7 +3294,7 @@ export default function GameCard({ game }: { game: GameCardData }) {
       <span aria-hidden className="pointer-events-none absolute inset-x-2 top-2 aspect-video rounded-[1.5rem] opacity-0 shadow-[0_28px_56px_-20px_var(--c)] transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100"
             style={{ "--c": glow } as React.CSSProperties} />
       {/* ảnh mờ làm nền: hiện ngay trong lúc ảnh thật còn đang tải */}
-      <div className="relative aspect-video overflow-hidden rounded-[1.5rem] bg-plum bg-cover ring-1 ring-[#8b5cf6]/25 transition-shadow duration-500 group-hover:ring-[#2af5d6]/60"
+      <div className="relative aspect-video overflow-hidden rounded-[1.5rem] bg-plum bg-cover ring-1 ring-[#8b5cf6]/25 transition-shadow duration-500 group-hover:ring-[#5eead4]/60"
            style={frame}>
         <Cover src={thumbOf(game)} title={game.title} engine={game.engine}
                className="h-full w-full transform-gpu object-cover transition-transform duration-700 ease-out group-hover:scale-105" />
@@ -2728,7 +3424,7 @@ export default function HeaderShell({ brand, brandBig, nav, tools }: Props) {
         </div>
 
         {/* Cả khối trượt lên (96px = 104px logo to - 8px đệm thêm khi thu nhỏ, như bản cũ). */}
-        <div className="relative mx-auto max-w-6xl px-3 will-change-transform md:[transform:translate3d(0,calc(var(--hp)*-96px),0)]">
+        <div className="relative mx-auto max-w-6xl px-1 will-change-transform sm:px-3 md:[transform:translate3d(0,calc(var(--hp)*-96px),0)]">
           {/* Nền pill ĐẶC: hiện dần, từ hẹp nở ra + trượt nhẹ vào vị trí.
               Lớp ngoài chỉ định vị (absolute), lớp trong mới mang .edge:
               .edge đặt position:relative trong globals.css nên KHÔNG được gộp chung với absolute. */}
@@ -2777,7 +3473,7 @@ export default function HeaderShell({ brand, brandBig, nav, tools }: Props) {
               {brand}
             </div>
             {nav}
-            <div className="ml-auto flex shrink-0 items-center gap-1.5 justify-self-end whitespace-nowrap will-change-transform md:ml-0 xl:[transform:translate3d(0,calc((1-var(--hp))*-80px),0)]">
+            <div className="ml-auto flex shrink-0 items-center gap-1 justify-self-end sm:gap-1.5 whitespace-nowrap will-change-transform md:ml-0 xl:[transform:translate3d(0,calc((1-var(--hp))*-80px),0)]">
               {tools}
             </div>
           </div>
@@ -2908,7 +3604,7 @@ export default function HeroSlider({ games }: { games: SlideData[] }) {
                   </div>
 
                   <Link href={`/game/${s.slug}`}
-                        className="group mt-7 inline-flex items-center gap-3 rounded-full bg-berry py-2.5 pl-7 pr-2.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition duration-300 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_18px_44px_-10px_var(--color-berry)] active:scale-95">
+                        className="group mt-7 inline-flex items-center gap-3 rounded-full bg-berry py-2.5 pl-7 pr-2.5 font-semibold text-ink shadow-md shadow-black/30 transition duration-300 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-md shadow-black/30 active:scale-95">
                     {site.home.featuredButton}
                     <span className="grid size-9 place-items-center rounded-full bg-ink/15 transition duration-300 group-hover:translate-x-0.5 group-hover:bg-ink/25">
                       <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -3014,7 +3710,7 @@ export default function HowTo() {
           <div className="relative flex shrink-0 flex-wrap gap-3">
             {hasDiscord && (
               <a href={site.discord} target="_blank" rel="noopener noreferrer"
-                 className="rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition duration-300 hover:-translate-y-0.5 active:scale-95">
+                 className="rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-md shadow-black/30 transition duration-300 hover:-translate-y-0.5 active:scale-95">
                 {site.nav.discord}
               </a>
             )}
@@ -3028,6 +3724,123 @@ export default function HowTo() {
         </div>
       )}
     </section>
+  );
+}
+
+
+=== FILE: src/components/KeyVault.tsx ===
+
+"use client";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { usePastOrders } from "@/lib/cart";
+import { useGameMeta } from "@/lib/game-meta";
+import { getSupabase } from "@/lib/supabase";
+
+type K = { slug: string; title: string; password: string };
+type Row = { code: string; at: number; keys: K[] };
+
+const fmtDate = (t: number) => new Date(t).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+// Trang "Key đã mua" (trong phần tài khoản): mỗi game một thẻ có ảnh, tên đầy đủ và mật khẩu ZIP.
+// Nguồn: đơn lưu ở trình duyệt này (có token) + đơn gắn với tài khoản đang đăng nhập (xem được trên máy khác).
+export default function KeyVault() {
+  const past = usePastOrders();
+  const meta = useGameMeta();
+  const [rows, setRows] = useState<Row[] | null>(null);
+  const [shown, setShown] = useState<Record<string, boolean>>({});
+  const [copied, setCopied] = useState<string | null>(null);
+  const [focus, setFocus] = useState("");
+  const sig = useMemo(() => past.map((o) => o.code).join(","), [past]);
+
+  useEffect(() => { setFocus(new URLSearchParams(window.location.search).get("order") ?? ""); }, []);
+
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      const found = new Map<string, Row>();
+      await Promise.all(past.map(async (o) => {
+        try {
+          const r = await fetch(`/api/orders/${o.code}?t=${o.token}`, { cache: "no-store" });
+          const d = r.ok ? await r.json() as { keys?: K[] } : null;
+          if (d?.keys?.length) found.set(o.code, { code: o.code, at: o.at, keys: d.keys });
+        } catch { /* lỗi mạng: bỏ qua đơn này */ }
+      }));
+      try {
+        const token = (await getSupabase()?.auth.getSession())?.data.session?.access_token;
+        if (token) {
+          const r = await fetch("/api/orders/mine", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+          const d = r.ok ? await r.json() as { orders: { code: string; paidAt: string | null; keys: K[] }[] } : null;
+          for (const o of d?.orders ?? []) if (o.keys.length) found.set(o.code, { code: o.code, at: o.paidAt ? Date.parse(o.paidAt) : found.get(o.code)?.at ?? 0, keys: o.keys });
+        }
+      } catch { /* chưa đăng nhập hoặc lỗi mạng: chỉ dùng đơn trên máy */ }
+      if (!dead) setRows([...found.values()].sort((a, b) => b.at - a.at));
+    })();
+    return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig]);
+
+  // Đơn vừa thanh toán (?order=...): cuộn tới và mở sẵn key.
+  useEffect(() => {
+    if (!focus || !rows?.some((r) => r.code === focus)) return;
+    setShown((s) => { const n = { ...s }; rows.find((r) => r.code === focus)?.keys.forEach((k) => { n[focus + k.slug] = true; }); return n; });
+    document.getElementById(`order-${focus}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [focus, rows]);
+
+  const copy = async (id: string, v: string) => {
+    try { await navigator.clipboard.writeText(v); setCopied(id); setTimeout(() => setCopied(null), 1500); }
+    catch { window.prompt("Sao chép (Ctrl+C):", v); }
+  };
+
+  return (
+    <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-8 sm:pt-12">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-berry">Tài khoản</p>
+      <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">Key đã mua</h1>
+      <p className="mt-3 max-w-[60ch] text-haze">Mật khẩu ZIP của các game bạn đã thanh toán. Lưu theo trình duyệt này; đăng nhập trước khi mua để xem lại trên mọi thiết bị.</p>
+
+      {rows === null ? (
+        <div className="mt-10 grid gap-4 sm:grid-cols-2" aria-busy>
+          {[0, 1].map((i) => <div key={i} className="glass h-72 animate-pulse rounded-3xl" />)}
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="glass mt-10 grid place-items-center rounded-3xl px-6 py-16 text-center">
+          <p className="font-display text-xl font-bold">Chưa có key nào</p>
+          <p className="mt-2 max-w-[44ch] text-sm text-haze">Vào trang game, bấm &ldquo;Mua key&rdquo;. Sau khi thanh toán xong, key sẽ hiện ở đây.</p>
+          <Link href="/#kho-game" className="mt-6 rounded-full bg-berry px-6 py-2.5 text-sm font-semibold text-ink transition hover:-translate-y-0.5 active:scale-95">Xem kho game</Link>
+        </div>
+      ) : rows.map((o) => (
+        <section key={o.code} id={`order-${o.code}`} className="mt-10 scroll-mt-24">
+          <h2 className="flex flex-wrap items-baseline gap-x-3 text-sm text-haze">
+            <span className="font-mono font-semibold text-mist">{o.code}</span>
+            {o.at > 0 && <span>{fmtDate(o.at)}</span>}
+            {o.code === focus && <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">Vừa thanh toán</span>}
+          </h2>
+          <ul className="mt-3 grid gap-4 sm:grid-cols-2">
+            {o.keys.map((k) => {
+              const id = o.code + k.slug, g = meta.get(k.slug), on = !!shown[id];
+              return (
+                <li key={id} className={`glass anim-pop overflow-hidden rounded-3xl ${o.code === focus ? "ring-2 ring-emerald-400/40" : ""}`}>
+                  <div className="relative aspect-video bg-plum">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {g?.thumb ? <img src={g.thumb} alt={k.title} loading="lazy" className="size-full object-cover" /> : <div className="grid size-full place-items-center font-display text-5xl font-bold text-white/30">{k.title.slice(0, 1)}</div>}
+                    <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink/80 via-transparent to-transparent" />
+                  </div>
+                  <div className="p-4">
+                    <Link href={`/game/${k.slug}`} className="font-display text-lg font-bold leading-snug transition hover:text-berry">{k.title}</Link>
+                    <div className="mt-3 flex items-center gap-2 rounded-2xl bg-ink/50 p-1.5 pl-4">
+                      <code className="min-w-0 flex-1 break-all font-mono text-base font-bold tracking-wide text-berry">{on ? k.password || "(chưa có)" : "••••••••••"}</code>
+                      <button type="button" onClick={() => setShown((s) => ({ ...s, [id]: !on }))} className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold transition hover:bg-white/20 active:scale-95">{on ? "Ẩn" : "Hiện key"}</button>
+                      <button type="button" onClick={() => copy(id, k.password)} disabled={!k.password} className="shrink-0 rounded-full bg-berry px-3 py-1.5 text-xs font-semibold text-ink transition hover:brightness-110 active:scale-95 disabled:opacity-40">{copied === id ? "Đã chép" : "Chép"}</button>
+                    </div>
+                    <Link href={`/game/${k.slug}`} className="mt-3 inline-block text-xs text-haze underline decoration-white/20 underline-offset-4 transition hover:text-mist">Mở trang tải game</Link>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </main>
   );
 }
 
@@ -3121,7 +3934,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
     if (id === "all") {
       return (
         <button key={id} onClick={() => swap(() => update({ engine: null }))} aria-pressed={on}
-                className={`${base} ${on ? "border-transparent bg-gradient-to-r from-[#7c3aed] to-[#db2777] text-white shadow-[0_8px_24px_-8px_#db2777]" : "border-[#a78bfa]/30 bg-[#a78bfa]/10 text-mist hover:bg-[#a78bfa]/20"}`}>
+                className={`${base} ${on ? "border-transparent bg-gradient-to-r from-[#7c3aed] to-[#d6407f] text-white shadow-[0_8px_24px_-8px_#d6407f]" : "border-[#a78bfa]/30 bg-[#a78bfa]/10 text-mist hover:bg-[#a78bfa]/20"}`}>
           {label} <span className={on ? "text-white/70" : "text-[#c4b5fd]"}>{count}</span>
         </button>
       );
@@ -3156,7 +3969,7 @@ export default function Library({ games }: { games: GameCardData[] }) {
           <div className="flex flex-wrap gap-2.5">
             {chip("all", "Tất cả", games.length)}
             {engines.map((e) => chip(e, e, games.filter((g) => g.engine === e).length))}
-            {([["fav", "Yêu thích", alive(fav), "#fb7185"], ["seen", "Đã xem", alive(seen), "#38bdf8"]] as const).map(([k, label, n, c]) => {
+            {([["fav", "Yêu thích", alive(fav), "#e5484d"], ["seen", "Đã xem", alive(seen), "#38bdf8"]] as const).filter(([k]) => filters.list === k).map(([k, label, n, c]) => {
               const on = filters.list === k;
               return (
                 <button key={k} onClick={() => swap(() => update({ list: on ? "all" : k }))} aria-pressed={on} style={tone(c, on)}
@@ -3249,7 +4062,7 @@ import { donateConfig, donateNavLabel } from "@/data/donate";
 import { softNav } from "@/lib/soft-nav";
 
 const tab =
-  "relative flex h-14 shrink-0 items-center gap-1.5 px-3 text-sm font-medium transition-colors after:absolute after:inset-x-3 after:bottom-2 after:h-[2.5px] after:origin-center after:rounded-full after:bg-gradient-to-r after:from-[#2af5d6] after:to-[#ff2e93] after:transition-transform after:duration-300";
+  "relative flex h-14 shrink-0 items-center gap-1.5 px-3 text-sm font-medium transition-colors after:absolute after:inset-x-3 after:bottom-2 after:h-[2.5px] after:origin-center after:rounded-full after:bg-gradient-to-r after:from-[#5eead4] after:to-[#ee5a96] after:transition-transform after:duration-300";
 const idle = "text-slate-400 after:scale-x-0 hover:text-mist hover:after:scale-x-100";
 const active = "text-mist after:scale-x-100";
 // Tab Donate: chữ + icon màu berry, gạch chân sáng lên khi đang ở /donate hoặc rê chuột.
@@ -3274,7 +4087,7 @@ export default function NavLinks({ engines }: { engines: string[] }) {
     <nav aria-label="Chính" className="hidden min-w-0 flex-1 justify-center overflow-x-auto [scrollbar-width:none] md:flex">
       <Link href="/" aria-current={home ? "page" : undefined} onClick={(e) => softNav(e, pathname, "", "top")}
             className={`${tab} ${home ? active : idle}`}>
-        <span className={home ? "text-[#2af5d6]" : ""}><Ico d={COMPASS} /></span>{site.nav.explore}
+        <span className={home ? "text-[#5eead4]" : ""}><Ico d={COMPASS} /></span>{site.nav.explore}
       </Link>
       <Link href="/#kho-game" onClick={(e) => softNav(e, pathname, "", "library")} className={`${tab} ${idle}`}>
         <Ico d={PAD} />{site.home.libraryTitle}
@@ -3372,7 +4185,7 @@ export default function NotificationBell({ notice, items }: { notice: string; it
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={toggle} aria-expanded={open} aria-haspopup="menu" aria-label="Thông báo"
-              className="relative grid size-10 place-items-center rounded-full bg-white/10 transition hover:bg-white/[0.16] active:scale-95">
+              className="relative grid size-9 place-items-center rounded-full bg-white/10 sm:size-10 transition hover:bg-white/[0.16] active:scale-95">
         <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M6 9a6 6 0 1 1 12 0c0 6 2 7.5 2 7.5H4S6 15 6 9ZM10 20a2 2 0 0 0 4 0" />
         </svg>
@@ -3523,7 +4336,7 @@ export default function Pagination({ page, pages, total, size, onPage }: {
             <li key={p}>
               <button type="button" onClick={() => onPage(p)} aria-label={`Trang ${p}`} aria-current={on ? "page" : undefined}
                       className={`${num} ${on
-                        ? "border-transparent bg-gradient-to-br from-[#7c3aed] to-[#db2777] text-white shadow-[0_8px_24px_-8px_#db2777]"
+                        ? "border-transparent bg-gradient-to-br from-[#7c3aed] to-[#d6407f] text-white shadow-[0_8px_24px_-8px_#d6407f]"
                         : "border-white/10 bg-white/[0.04] text-mist/80 hover:-translate-y-0.5 hover:border-[#a78bfa]/50 hover:bg-[#a78bfa]/15 hover:text-mist active:scale-95"}`}>
                 {p}
               </button>
@@ -3538,6 +4351,178 @@ export default function Pagination({ page, pages, total, size, onPage }: {
       </ul>
       <p aria-live="polite" className="text-xs tabular-nums text-haze">Trang {page}/{pages} · game {from}–{to} / {total}</p>
     </nav>
+  );
+}
+
+
+=== FILE: src/components/PayDonate.tsx ===
+
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { getSupabase } from "@/lib/supabase";
+
+type Order = { code: string; amount: number; expiresAt: string; qr: string; bank: { bankName: string; accountNumber: string; accountHolder: string } };
+type Status = "pending" | "paid" | "underpaid" | "expired";
+
+const PRESETS = [10000, 20000, 50000, 100000];
+const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ";
+
+// Donate có QR riêng cho từng đơn: số tiền + nội dung (mã đơn) đã gắn sẵn trong QR, trang tự nhận khi tiền vào tài khoản.
+export default function PayDonate() {
+  const [amount, setAmount] = useState(20000);
+  const [custom, setCustom] = useState("");
+  const [note, setNote] = useState("");
+  const [order, setOrder] = useState<Order | null>(null);
+  const [status, setStatus] = useState<Status>("pending");
+  const [paid, setPaid] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [left, setLeft] = useState(0);
+  const [copied, setCopied] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const create = async () => {
+    if (busy) return;
+    const value = custom ? Number(custom.replace(/\D/g, "")) : amount;
+    if (!Number.isInteger(value) || value < 1000) { setErr("Số tiền tối thiểu 1.000đ."); return; }
+    setBusy(true); setErr(null);
+    try {
+      const token = (await getSupabase()?.auth.getSession())?.data.session?.access_token;
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ amount: value, note }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErr(body.code === "rate" ? "Bạn thao tác quá nhanh, đợi một lúc rồi thử lại." : body.code === "invalid_amount" ? "Số tiền không hợp lệ (1.000đ đến 5.000.000đ)." : "Không tạo được đơn. Thử lại sau ít phút.");
+        return;
+      }
+      setOrder(body as Order); setStatus("pending"); setPaid(null);
+    } catch {
+      setErr("Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.");
+    } finally { setBusy(false); }
+  };
+
+  // Polling mỗi 3s trong lúc chờ; dừng khi đã paid/expired. underpaid vẫn poll tiếp (khách có thể chuyển bù).
+  useEffect(() => {
+    if (!order || status === "paid" || status === "expired") return;
+    let dead = false;
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/orders/${order.code}`, { cache: "no-store" });
+        if (r.ok) {
+          const d = await r.json() as { status: Status; paidAmount: number | null };
+          if (dead) return;
+          setStatus(d.status); setPaid(d.paidAmount);
+          if (d.status === "paid" || d.status === "expired") return;
+        }
+      } catch { /* mạng chập chờn: thử lại nhịp sau */ }
+      if (!dead) timer.current = setTimeout(tick, 3000);
+    };
+    timer.current = setTimeout(tick, 3000);
+    return () => { dead = true; if (timer.current) clearTimeout(timer.current); };
+  }, [order, status]);
+
+  // Đồng hồ đếm ngược hết hạn.
+  useEffect(() => {
+    if (!order || status === "paid") return;
+    const upd = () => setLeft(Math.max(0, Math.floor((Date.parse(order.expiresAt) - Date.now()) / 1000)));
+    upd();
+    const t = setInterval(upd, 1000);
+    return () => clearInterval(t);
+  }, [order, status]);
+
+  const copy = async (k: string, v: string) => {
+    try { await navigator.clipboard.writeText(v); setCopied(k); setTimeout(() => setCopied(null), 1500); }
+    catch { window.prompt("Sao chép (Ctrl+C):", v); }
+  };
+  const reset = () => { setOrder(null); setStatus("pending"); setPaid(null); setErr(null); };
+
+  const field = "w-full rounded-xl bg-white/[0.07] px-4 py-2.5 text-sm outline-none ring-1 ring-white/10 placeholder:text-haze focus:bg-white/10 focus-visible:ring-2 focus-visible:ring-berry";
+
+  if (!order) {
+    return (
+      <section className="glass anim-pop mx-auto mt-8 max-w-2xl rounded-[2rem] p-6 shadow-2xl shadow-black/50 sm:p-8">
+        <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Ủng hộ nhanh bằng QR</h2>
+        <p className="mt-1 text-sm text-haze">Chọn số tiền, quét mã QR bằng app ngân hàng. Hệ thống tự xác nhận trong vài giây.</p>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          {PRESETS.map((v) => {
+            const on = !custom && amount === v;
+            return (
+              <button key={v} type="button" aria-pressed={on} onClick={() => { setAmount(v); setCustom(""); }}
+                      className={`rounded-full border px-4 py-2 text-sm font-semibold tabular-nums transition active:scale-95 ${on ? "border-transparent bg-berry text-ink" : "border-white/15 bg-white/[0.05] hover:bg-white/10"}`}>
+                {fmt(v)}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <input inputMode="numeric" value={custom} onChange={(e) => setCustom(e.target.value.replace(/\D/g, "").slice(0, 8))} placeholder="Hoặc nhập số tiền khác" aria-label="Số tiền khác" className={field} />
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={100} placeholder="Tên bạn / game muốn dịch (không bắt buộc)" aria-label="Ghi chú" className={field} />
+        </div>
+
+        {err && <p role="alert" className="mt-4 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{err}</p>}
+        <button type="button" onClick={create} disabled={busy}
+                className="mt-5 w-full rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
+          {busy ? "Đang tạo mã QR…" : "Tạo mã QR"}
+        </button>
+      </section>
+    );
+  }
+
+  if (status === "paid") {
+    return (
+      <section role="status" className="glass anim-pop mx-auto mt-8 max-w-2xl rounded-[2rem] p-8 text-center shadow-2xl shadow-black/50">
+        <span className="mx-auto grid size-16 place-items-center rounded-full bg-emerald-500/15 text-emerald-300">
+          <svg viewBox="0 0 20 20" className="size-8" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m4.5 10.5 3.5 3.5 7.5-8" /></svg>
+        </span>
+        <h2 className="mt-4 font-display text-2xl font-bold">Đã nhận {fmt(paid ?? order.amount)}</h2>
+        <p className="mt-2 text-haze">Cảm ơn bạn đã ủng hộ GSVH! Mã đơn: <b className="text-mist">{order.code}</b></p>
+        <button type="button" onClick={reset} className="mt-6 rounded-full bg-white/10 px-6 py-2.5 text-sm font-semibold transition hover:bg-white/20 active:scale-95">Ủng hộ thêm</button>
+      </section>
+    );
+  }
+
+  const expired = status === "expired" || left === 0;
+  const rows = [
+    ["Ngân hàng", order.bank.bankName, "bank"],
+    ["STK", order.bank.accountNumber, "acc"],
+    ["Số tiền", String(order.amount), "amt"],
+    ["Nội dung", order.code, "code"],
+  ] as const;
+
+  return (
+    <section className="glass anim-pop mx-auto mt-8 max-w-2xl rounded-[2rem] p-6 text-center shadow-2xl shadow-black/50 sm:p-8">
+      <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Quét mã để thanh toán {fmt(order.amount)}</h2>
+      <div className="relative mx-auto mt-5 w-fit rounded-3xl bg-white p-4 shadow-lg">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={order.qr} alt={`Mã QR thanh toán ${fmt(order.amount)}, nội dung ${order.code}`} className={`size-60 object-contain sm:size-64 ${expired ? "opacity-20" : ""}`} />
+        {expired && <div className="absolute inset-0 grid place-items-center text-sm font-semibold text-neutral-700">Mã đã hết hạn</div>}
+      </div>
+
+      <p role="status" aria-live="polite" className="mt-4 text-sm text-haze">
+        {expired ? "Đơn đã hết hạn. Nếu bạn đã chuyển tiền, hệ thống vẫn sẽ ghi nhận." :
+          status === "underpaid" ? `Đã nhận ${fmt(paid ?? 0)}, còn thiếu ${fmt(order.amount - (paid ?? 0))}. Vui lòng chuyển bù với đúng nội dung.` :
+          <>Đang chờ thanh toán… còn <b className="tabular-nums text-mist">{Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</b></>}
+      </p>
+
+      <dl className="mx-auto mt-5 max-w-lg divide-y divide-white/10 rounded-2xl border border-white/10 bg-ink/40 px-5 text-left">
+        {rows.map(([label, value, k]) => (
+          <div key={k} className="grid grid-cols-[100px_1fr_auto] items-center gap-3 py-3">
+            <dt className="text-sm text-haze">{label}</dt>
+            <dd className="break-all font-display text-sm font-bold tracking-wide text-berry tabular-nums">{k === "amt" ? fmt(Number(value)) : value}</dd>
+            <button type="button" onClick={() => copy(k, value)} className="rounded-full bg-white/10 px-3 py-1 text-xs transition hover:bg-white/20">{copied === k ? "Đã chép" : "Chép"}</button>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-xs text-haze">Chuyển đúng số tiền và nội dung để được duyệt tự động.</p>
+
+      <button type="button" onClick={reset} className="mt-5 rounded-full bg-white/10 px-6 py-2.5 text-sm font-semibold transition hover:bg-white/20 active:scale-95">
+        {expired ? "Tạo mã mới" : "Hủy, đổi số tiền"}
+      </button>
+    </section>
   );
 }
 
@@ -3572,7 +4557,7 @@ export default function PopupNotice() {
         <h2 id="popup-title" className="font-display text-2xl font-extrabold tracking-tight text-balance">{title}</h2>
         <p className="mt-4 whitespace-pre-line text-left leading-relaxed text-mist/85">{text}</p>
         <button type="button" data-autofocus onClick={() => setClosed(true)}
-                className="mt-6 w-full rounded-full bg-berry px-7 py-3 font-semibold text-ink shadow-[0_14px_36px_-12px_var(--color-berry)] transition hover:-translate-y-0.5 active:scale-95">
+                className="mt-6 w-full rounded-full bg-berry px-7 py-3 font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95">
           Đã hiểu
         </button>
       </div>
@@ -3616,7 +4601,7 @@ export default function QuickAccess({ games }: { games: GameCardData[] }) {
       dot: engineColor(e), search: `?engine=${encodeURIComponent(e)}`,
     })),
     ...(vh > 0 ? [{ id: "vh", label: "Việt hóa", count: vh, dot: "#2dd4bf", search: `?tag=${encodeURIComponent("Việt hóa")}` }] : []),
-    ...(favCount > 0 ? [{ id: "fav", label: "Yêu thích của bạn", count: favCount, dot: "#ff6b98", search: "?list=fav" }] : []),
+    ...(favCount > 0 ? [{ id: "fav", label: "Yêu thích của bạn", count: favCount, dot: "#e5484d", search: "?list=fav" }] : []),
     ...(cheat > 0 ? [{ id: "cheat", label: "Có Cheat", count: cheat, dot: "#fbbf24", search: "?tag=Cheat" }] : []),
   ];
   const hasDiscord = /^https?:\/\//i.test(site.discord);
@@ -3859,7 +4844,7 @@ export default function SearchBox() {
   return (
     <>
       <button onClick={show} onPointerEnter={warm} onFocus={warm} aria-label="Tìm kiếm"
-              className="flex h-10 items-center justify-center rounded-lg border border-[rgba(148,163,184,0.22)] bg-[rgba(30,27,46,0.85)] px-3 text-sm text-slate-400 transition hover:border-[#2af5d6]/40 hover:text-white sm:w-44 sm:justify-between xl:w-60 sm:px-4">
+              className="flex h-9 items-center justify-center rounded-lg sm:h-10 border border-[rgba(148,163,184,0.22)] bg-[rgba(30,27,46,0.85)] px-2.5 text-sm text-slate-400 transition hover:border-[#5eead4]/40 hover:text-white sm:w-44 sm:justify-between xl:w-60 sm:px-4">
         <span className="hidden sm:inline">Tìm kiếm game...</span>
         <span className="flex items-center gap-2">
           <kbd className="hidden rounded-md bg-white/10 px-1.5 py-0.5 font-sans text-[11px] text-haze xl:inline">Ctrl K</kbd>
@@ -5202,6 +6187,57 @@ export const validatePassword = (v: string) =>
   : null;
 
 
+=== FILE: src/lib/cart.ts ===
+
+import { useSyncExternalStore } from "react";
+
+// Giỏ hàng + các đơn đã tạo (để xem lại key) lưu ở localStorage, đồng bộ giữa tab bằng sự kiện "storage".
+// Giá không lưu ở đây: luôn lấy từ /api/keys và server tính lại khi tạo đơn.
+export type PastOrder = { code: string; token: string; at: number };
+const CART_KEY = "gsvh-cart", ORDERS_KEY = "gsvh-orders", EVENT = "cart-change";
+const MAX_ORDERS = 20;
+const EMPTY_CART: string[] = [];
+const EMPTY_ORDERS: PastOrder[] = [];
+
+const cache = new Map<string, { raw: string | null; val: unknown }>();
+function read<T>(key: string, empty: T, ok: (v: unknown) => T | null): T {
+  let raw: string | null = null;
+  try { raw = localStorage.getItem(key); } catch { return empty; }
+  const c = cache.get(key);
+  if (c && c.raw === raw) return c.val as T;
+  let val = empty;
+  try { val = (raw ? ok(JSON.parse(raw)) : null) ?? empty; } catch { /* dữ liệu hỏng: coi như rỗng */ }
+  cache.set(key, { raw, val });
+  return val;
+}
+function write(key: string, v: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* riêng tư / đầy bộ nhớ: bỏ qua */ }
+  window.dispatchEvent(new Event(EVENT));
+}
+
+const readCart = () => read<string[]>(CART_KEY, EMPTY_CART, (v) => Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : null);
+const readOrders = () => read<PastOrder[]>(ORDERS_KEY, EMPTY_ORDERS, (v) => Array.isArray(v)
+  ? v.filter((o): o is PastOrder => !!o && typeof o.code === "string" && typeof o.token === "string" && typeof o.at === "number") : null);
+
+const subscribe = (cb: () => void) => {
+  window.addEventListener("storage", cb);
+  window.addEventListener(EVENT, cb);
+  return () => { window.removeEventListener("storage", cb); window.removeEventListener(EVENT, cb); };
+};
+
+export const useCart = () => useSyncExternalStore(subscribe, readCart, () => EMPTY_CART);
+export const usePastOrders = () => useSyncExternalStore(subscribe, readOrders, () => EMPTY_ORDERS);
+
+export const addToCart = (slug: string) => { const c = readCart(); if (!c.includes(slug)) write(CART_KEY, [...c, slug]); };
+export const removeFromCart = (slug: string) => write(CART_KEY, readCart().filter((s) => s !== slug));
+export const clearCart = () => write(CART_KEY, []);
+export const rememberOrder = (o: { code: string; token: string }) =>
+  write(ORDERS_KEY, [{ ...o, at: Date.now() }, ...readOrders().filter((x) => x.code !== o.code)].slice(0, MAX_ORDERS));
+
+// Cho phép mở giỏ từ nơi khác (nút "Mua key" ở trang game).
+export const openCart = () => window.dispatchEvent(new Event("cart-open"));
+
+
 === FILE: src/lib/game-badges.ts ===
 
 import { fold } from "./library-filter";
@@ -5239,6 +6275,34 @@ export const isBadgeTag = (tag: string) => {
 };
 
 
+=== FILE: src/lib/game-meta.ts ===
+
+import { useEffect, useState } from "react";
+
+// Tên + ảnh nhỏ của game lấy từ /search-index.json (nhẹ, đã có sẵn). Không import data/games vào client để header
+// (có giỏ hàng) không kéo cả games.json vào mọi trang.
+export type GameMeta = { slug: string; title: string; thumb: string };
+let pending: Promise<Map<string, GameMeta>> | null = null;
+export function loadGameMeta(): Promise<Map<string, GameMeta>> {
+  pending ??= fetch("/search-index.json")
+    .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<GameMeta[]>; })
+    .then((a) => new Map(a.map((g) => [g.slug, g] as const)))
+    .catch((e) => { pending = null; throw e; });
+  return pending;
+}
+const EMPTY = new Map<string, GameMeta>();
+export function useGameMeta(active = true) {
+  const [m, setM] = useState(EMPTY);
+  useEffect(() => {
+    if (!active) return;
+    let dead = false;
+    loadGameMeta().then((x) => { if (!dead) setM(x); }, () => { /* thiếu ảnh/tên thì dùng slug */ });
+    return () => { dead = true; };
+  }, [active]);
+  return m;
+}
+
+
 === FILE: src/lib/game-ui.ts ===
 
 import type { CSSProperties } from "react";
@@ -5254,8 +6318,8 @@ const ENGINE_ALIAS: Record<string, string> = { "RPG Maker": "RPGM", RPGMaker: "R
 export const engineColor = (engine: string) => ENGINE_COLOR[engine] ?? ENGINE_COLOR[ENGINE_ALIAS[engine] ?? ""] ?? "#a78bfa";
 
 // ---------- màu nhấn theo game ----------
-export const FALLBACK_ACCENT = "#ff2e93";
-const FALLBACK_ACCENT2 = "#b537f2";
+export const FALLBACK_ACCENT = "#ee5a96";
+const FALLBACK_ACCENT2 = "#9d6bf0";
 const DARK = "#0f0c1a";
 
 const lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
@@ -5310,6 +6374,21 @@ export function providerOf(url: string) {
   const hit = PROVIDERS.find(([re]) => re.test(host));
   return { name: hit ? hit[1] : host || "Liên kết", color: hit ? hit[2] : "#a59dc9", host };
 }
+
+
+=== FILE: src/lib/key-prices.ts ===
+
+// Giá key công khai (/api/keys) tải một lần, dùng chung cho nút "Mua key" và trang giỏ hàng. Lỗi thì lần sau tải lại.
+export type Price = { slug: string; price: number; fee: number };
+let pending: Promise<Price[]> | null = null;
+export function loadKeyRows(): Promise<Price[]> {
+  pending ??= fetch("/api/keys", { cache: "no-store" })
+    .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<{ items: Price[] }>; })
+    .then((d) => d.items)
+    .catch((e) => { pending = null; throw e; });
+  return pending;
+}
+export const loadKeyPrices = () => loadKeyRows().then((rows) => new Map(rows.map((i) => [i.slug, i.price + i.fee] as const)));
 
 
 === FILE: src/lib/library-filter.ts ===
@@ -5555,6 +6634,38 @@ export async function reportError(err: unknown, ctx: Ctx): Promise<void> {
     console.error("[notify] reportError failed:", inner);
   }
 }
+
+
+=== FILE: src/lib/payment.ts ===
+
+// Chỉ import từ route handler. Cấu hình thanh toán QR: lấy tài khoản nhận từ site.json -> donate (cùng nguồn với trang Donate).
+import { randomInt } from "node:crypto";
+import { donateConfig } from "@/data/donate";
+
+export const ORDER_PREFIX = "GSVH"; // phải khớp regex trong hàm SQL process_bank_tx
+export const MIN_AMOUNT = 1000;
+export const MAX_AMOUNT = 5_000_000;
+export const ORDER_TTL_MIN = 30;
+
+// Bỏ ký tự dễ nhầm (0/O, 1/I) vì khách có thể gõ tay nội dung chuyển khoản.
+const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export const newOrderCode = () =>
+  ORDER_PREFIX + Array.from({ length: 6 }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
+
+// Mã VietQR của MB là "MB" (img.vietqr.io nhận cả "MB" lẫn "MBBank"). Đổi bank ở site.json -> donate.bankName.
+const bankCode = () => donateConfig.bankName.replace(/\s+/g, "") || "MB";
+
+export function qrUrl(amount: number, code: string): string {
+  const name = donateConfig.accountHolder ? `&accountName=${encodeURIComponent(donateConfig.accountHolder)}` : "";
+  return `https://img.vietqr.io/image/${encodeURIComponent(bankCode())}-${encodeURIComponent(donateConfig.accountNumber)}-compact2.png` +
+    `?amount=${amount}&addInfo=${encodeURIComponent(code)}${name}`;
+}
+
+export const bankInfo = () => ({
+  bankName: donateConfig.bankName,
+  accountNumber: donateConfig.accountNumber,
+  accountHolder: donateConfig.accountHolder,
+});
 
 
 === FILE: src/lib/soft-nav.ts ===
