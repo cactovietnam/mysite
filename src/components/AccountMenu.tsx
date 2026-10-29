@@ -6,7 +6,6 @@ import { authConfigured, getSupabase } from "@/lib/supabase";
 import { displayName, useAuthUser } from "@/lib/auth-store";
 import { donateConfig, donateNavLabel } from "@/data/donate";
 import { useList } from "@/lib/user-lists";
-import { openCart } from "@/lib/cart";
 import { softNav } from "@/lib/soft-nav";
 
 const num = "rounded-full bg-white/10 px-2 py-0.5 text-xs tabular-nums text-haze";
@@ -71,7 +70,7 @@ export default function AccountMenu() {
                 </Link>
               ))}
               <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>
-              <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); openCart(); }}>Giỏ hàng</button>
+              <Link href="/gio-hang" role="menuitem" onClick={() => setOpen(false)} className={item}>Giỏ hàng</Link>
               {donateConfig.enabled && <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>}
               <div className="my-1 border-t border-white/10" />
               <button type="button" role="menuitem" className={item}
@@ -92,7 +91,7 @@ export default function AccountMenu() {
                 </Link>
               ))}
               <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>
-              <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); openCart(); }}>Giỏ hàng</button>
+              <Link href="/gio-hang" role="menuitem" onClick={() => setOpen(false)} className={item}>Giỏ hàng</Link>
               {donateConfig.enabled && <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>}
             </>
           )}
