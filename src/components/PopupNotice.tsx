@@ -10,6 +10,19 @@ import { useAgeOk } from "./AgeGate";
 const cfg = (site as unknown as { popup?: { enabled?: boolean; title?: string; text?: string } }).popup;
 const text = (cfg?.text ?? "").trim();
 const title = (cfg?.title ?? "").trim() || "Thông báo";
+const SNOOZE_KEY = "gsvh-popup-snooze";
+const DAY = 24 * 60 * 60 * 1000;
+// Dấu vân tay nội dung: admin sửa tiêu đề/nội dung thì mã đổi => lời "tắt 24h" cũ của người dùng tự vô hiệu, họ phải bấm lại.
+const sig = `${title}\n${text}\n${site.discord}\n${site.facebook}`.split("").reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7).toString(36);
+function snoozed() {
+  try {
+    const v = JSON.parse(localStorage.getItem(SNOOZE_KEY) ?? "null") as { sig?: string; until?: number } | null;
+    return !!v && v.sig === sig && typeof v.until === "number" && v.until > Date.now();
+  } catch { return false; }
+}
+function snooze() {
+  try { localStorage.setItem(SNOOZE_KEY, JSON.stringify({ sig, until: Date.now() + DAY })); } catch { /* chế độ riêng tư: bỏ qua, lần sau hiện lại */ }
+}
 const isUrl = (u: string) => /^https?:\/\//i.test(u);
 
 const CHANNELS = [
@@ -19,7 +32,7 @@ const CHANNELS = [
 
 export default function PopupNotice() {
   const ageOk = useAgeOk();
-  const [closed, setClosed] = useState(false);
+  const [closed, setClosed] = useState(snoozed); // lazy init chỉ chạy ở client; popup chỉ mở sau khi qua cổng 18+ nên không lệch hydration
   // Có cổng 18+ thì đợi người dùng qua cổng rồi mới hiện (tránh hai hộp thoại tranh focus)
   const open = Boolean(cfg?.enabled && text) && !closed && (!site.ageGate.enabled || ageOk);
   const ref = useModal(open, () => setClosed(true));
@@ -65,6 +78,10 @@ export default function PopupNotice() {
           <button type="button" data-autofocus onClick={() => setClosed(true)}
                   className="mt-5 w-full rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95">
             Đã hiểu
+          </button>
+          <button type="button" onClick={() => { snooze(); setClosed(true); }}
+                  className="mt-2 w-full rounded-full px-7 py-2.5 text-sm text-haze transition hover:bg-white/5 hover:text-white">
+            Không hiện lại trong 24 giờ
           </button>
         </div>
       </div>

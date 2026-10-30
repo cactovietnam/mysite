@@ -17,12 +17,12 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 import quan_ly as q
 
 # ---------- giao diện ----------
-BG, PANEL, CARD = "#0b1220", "#111a2e", "#16223a"
-ROW_A, ROW_B, LINE = "#111a2e", "#15203a", "#24324f"
+BG, PANEL, CARD = "#0c111d", "#121a2b", "#1a2540"
+ROW_A, ROW_B, LINE = "#121a2b", "#162036", "#2a3a5e"
 TEXT, MUTED = "#e6ecf8", "#8a9bb8"
-ACCENT, ACCENT_H = "#3b82f6", "#5b9bff"
+ACCENT, ACCENT_H = "#5b8cff", "#7aa2ff"
 OK, WARN, BAD = "#34d399", "#fbbf24", "#f87171"
-SEL = "#1f3a6b"
+SEL = "#25427c"
 FONT, FONT_B, FONT_S = ("Segoe UI", 11), ("Segoe UI", 11, "bold"), ("Segoe UI", 10)
 MONO = ("Consolas", 11)
 
@@ -111,11 +111,12 @@ class _Out:
 
 # ---------- widget nhỏ ----------
 def button(parent, text, cmd, kind="ghost"):
-    bg, hv, fg = {"primary": (ACCENT, ACCENT_H, "#fff"), "danger": ("#7f1d1d", "#b91c1c", "#fff"),
-                  "ghost": (CARD, LINE, TEXT)}[kind]
-    b = tk.Button(parent, text=text, command=cmd, bg=bg, fg=fg, activebackground=hv, activeforeground=fg,
-                  relief="flat", bd=0, padx=20, pady=10, font=FONT_B if kind == "primary" else FONT, cursor="hand2")
-    b.bind("<Enter>", lambda e: b.config(bg=hv)); b.bind("<Leave>", lambda e: b.config(bg=bg))
+    bg, hv, fg, edge = {"primary": (ACCENT, ACCENT_H, "#fff", ACCENT), "danger": ("#2a1519", "#7f1d1d", "#fca5a5", "#7f1d1d"),
+                        "ghost": (CARD, LINE, TEXT, LINE)}[kind]
+    b = tk.Button(parent, text=text, command=cmd, bg=bg, fg=fg, activebackground=hv, activeforeground="#fff",
+                  relief="flat", bd=0, padx=18, pady=9, font=FONT_B if kind == "primary" else FONT, cursor="hand2",
+                  highlightthickness=1, highlightbackground=edge, highlightcolor=edge, disabledforeground=MUTED)
+    b.bind("<Enter>", lambda e: b.cget("state") != "disabled" and b.config(bg=hv)); b.bind("<Leave>", lambda e: b.config(bg=bg))
     return b
 
 
@@ -741,7 +742,8 @@ class Cmd7Window(tk.Toplevel):
 
     # --- cột trái ---
     def _card(self, parent, key, name, desc, kind):
-        f = tk.Frame(parent, bg=CARD, padx=16, pady=12, cursor="hand2"); f.pack(fill="x", pady=5)
+        strip = tk.Frame(parent, bg=self.BADGE[kind][1]); strip.pack(fill="x", pady=5)
+        f = tk.Frame(strip, bg=CARD, padx=16, pady=12, cursor="hand2"); f.pack(fill="x", padx=(3, 0))
         l1 = tk.Label(f, text=f"{key}   {name}", bg=CARD, fg=TEXT, font=FONT_B, anchor="w", cursor="hand2"); l1.pack(fill="x")
         l2 = tk.Label(f, text=desc, bg=CARD, fg=MUTED, font=FONT_S, anchor="w", justify="left", wraplength=310, cursor="hand2"); l2.pack(fill="x")
         txt, col = self.BADGE[kind]
@@ -874,7 +876,8 @@ class App(tk.Tk):
     def _build(self):
         head = tk.Frame(self, bg=BG, padx=28, pady=20); head.pack(fill="x")
         left = tk.Frame(head, bg=BG); left.pack(side="left")
-        tk.Label(left, text="Quản lý game", bg=BG, fg=TEXT, font=("Segoe UI", 24, "bold")).pack(anchor="w")
+        tk.Label(left, text="Quản lý game", bg=BG, fg=TEXT, font=("Segoe UI Semibold", 24)).pack(anchor="w")
+        tk.Frame(left, bg=ACCENT, height=3, width=56).pack(anchor="w", pady=(4, 6))
         tk.Label(left, text=str(q.ROOT), bg=BG, fg=MUTED, font=FONT_S).pack(anchor="w")
         self.info = tk.Label(head, text="", bg=BG, fg=MUTED, font=FONT_S, justify="right"); self.info.pack(side="right")
 
@@ -890,7 +893,8 @@ class App(tk.Tk):
         row = tk.Frame(self, bg=BG, padx=22); row.pack(fill="x")
         for key, label, color in [("total", "Tổng số game", TEXT), ("size", "Tổng dung lượng", TEXT),
                                   ("nocover", "Thiếu bìa", BAD), ("nolink", "Thiếu link / intro", WARN)]:
-            c = tk.Frame(row, bg=PANEL, padx=24, pady=16); c.pack(side="left", fill="x", expand=True, padx=6)
+            o = tk.Frame(row, bg=color if color != TEXT else ACCENT); o.pack(side="left", fill="x", expand=True, padx=6)
+            c = tk.Frame(o, bg=PANEL, padx=24, pady=16); c.pack(fill="both", expand=True, padx=(4, 0))
             tk.Label(c, text=label, bg=PANEL, fg=MUTED, font=FONT_S).pack(anchor="w")
             self.cards[key] = tk.Label(c, text="0", bg=PANEL, fg=color, font=("Segoe UI", 22, "bold"))
             self.cards[key].pack(anchor="w")
