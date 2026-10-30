@@ -1336,23 +1336,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
 === FILE: src/app/tai-khoan/discord/page.tsx ===
 
 import type { Metadata } from "next";
-import AccountTabs from "@/components/AccountTabs";
 import DiscordLinkCard from "@/components/DiscordLinkCard";
 
 export const metadata: Metadata = { title: "Liên kết Discord", robots: { index: false, follow: false } };
 
 export default function Page() {
-  return (
-    <>
-      <AccountTabs />
-      <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-8 sm:pt-12">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-berry">Tài khoản</p>
-        <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">Discord</h1>
-        <p className="mt-3 max-w-[60ch] text-haze">Liên kết tài khoản này với Discord để nhận role khách hàng trong server sau khi mua key. Mỗi tài khoản chỉ liên kết được một Discord.</p>
-        <div className="mt-8"><DiscordLinkCard /></div>
-      </main>
-    </>
-  );
+  return <DiscordLinkCard />;
 }
 
 
@@ -1360,17 +1349,50 @@ export default function Page() {
 
 import type { Metadata } from "next";
 import KeyVault from "@/components/KeyVault";
-import AccountTabs from "@/components/AccountTabs";
 
 export const metadata: Metadata = { title: "Key đã mua", robots: { index: false, follow: false } };
 
+// Thanh tab cũ (AccountTabs) đã được thay bằng AccountNav trong layout.tsx.
 export default function Page() {
+  return <KeyVault />;
+}
+
+
+=== FILE: src/app/tai-khoan/layout.tsx ===
+
+import AccountNav from "@/components/account/AccountNav";
+
+export default function AccountLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      <AccountTabs />
-      <KeyVault />
-    </>
+    <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 pt-8 sm:pt-12 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-12">
+      <AccountNav />
+      <div className="min-w-0">{children}</div>
+    </div>
   );
+}
+
+
+=== FILE: src/app/tai-khoan/page.tsx ===
+
+import type { Metadata } from "next";
+import Collection from "@/components/account/Collection";
+
+export const metadata: Metadata = { title: "Bộ sưu tập", robots: { index: false, follow: false } };
+
+export default function Page() {
+  return <Collection />;
+}
+
+
+=== FILE: src/app/tai-khoan/yeu-thich/page.tsx ===
+
+import type { Metadata } from "next";
+import Saved from "@/components/account/Saved";
+
+export const metadata: Metadata = { title: "Yêu thích & Đã xem", robots: { index: false, follow: false } };
+
+export default function Page() {
+  return <Saved />;
 }
 
 
@@ -1379,6 +1401,244 @@ export default function Page() {
 // template (khác layout) được dựng lại mỗi lần đổi trang, nên class anim-page chạy lại và tạo hiệu ứng "vào trang".
 export default function Template({ children }: { children: React.ReactNode }) {
   return <div className="anim-page">{children}</div>;
+}
+
+
+=== FILE: src/components/account/AccountNav.tsx ===
+
+"use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const GROUPS = [
+  { label: "Sở hữu", items: [["/tai-khoan", "Bộ sưu tập"], ["/tai-khoan/yeu-thich", "Yêu thích & Đã xem"]] },
+  { label: "Giao dịch", items: [["/tai-khoan/key", "Key đã mua"], ["/gio-hang", "Giỏ hàng"]] },
+  { label: "Cộng đồng", items: [["/tai-khoan/discord", "Discord"]] },
+] as const;
+
+// Điều hướng khu Tài khoản: cột dọc có nhóm từ màn lg, thanh tab cuộn ngang ở màn nhỏ.
+export default function AccountNav() {
+  const pathname = usePathname();
+  let n = 0;
+  return (
+    <nav aria-label="Tài khoản" className="lg:sticky lg:top-24 lg:self-start">
+      <p className="mb-4 hidden text-[11px] font-semibold uppercase tracking-[0.22em] text-haze lg:block">Khu tài khoản</p>
+      <div className="flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none] lg:flex-col lg:gap-0 lg:overflow-visible">
+        {GROUPS.map((g) => (
+          <div key={g.label} className="flex shrink-0 gap-1 lg:mb-5 lg:flex-col lg:gap-0">
+            <p className="hidden pb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-haze/70 lg:block">{g.label}</p>
+            {g.items.map(([href, label]) => {
+              const on = pathname === href;
+              n++;
+              return (
+                <Link key={href} href={href} aria-current={on ? "page" : undefined}
+                      className={`relative flex items-center gap-3 whitespace-nowrap px-3 py-2.5 text-sm font-medium transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-[2px] after:rounded-full after:bg-gradient-to-r after:from-[#5eead4] after:to-[#ee5a96] after:transition-transform after:duration-300 lg:px-0 lg:after:inset-x-0 ${
+                        on ? "text-mist after:scale-x-100" : "text-slate-400 after:scale-x-0 hover:text-mist hover:after:scale-x-100"}`}>
+                  <span className={`font-mono text-[11px] tabular-nums ${on ? "text-[#5eead4]" : "text-haze/60"}`}>{String(n).padStart(2, "0")}</span>
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+
+=== FILE: src/components/account/Collection.tsx ===
+
+"use client";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { getSupabase } from "@/lib/supabase";
+import { useAuthUser } from "@/lib/auth-store";
+import { fold } from "@/lib/library-filter";
+import { GameTiles, PageHead, selectCls, useGameIndex } from "./GameTiles";
+
+type Own = "own" | "not" | "all";
+type Sort = "recent" | "new" | "name";
+
+// Bộ sưu tập = game đã có đơn key thanh toán gắn với tài khoản (cùng nguồn với trang Key đã mua).
+export default function Collection() {
+  const user = useAuthUser();
+  const { games, failed } = useGameIndex();
+  const [owned, setOwned] = useState<Map<string, number> | null>(null); // slug -> thời điểm mua
+  const [q, setQ] = useState("");
+  const [own, setOwn] = useState<Own>("own");
+  const [engine, setEngine] = useState("");
+  const [sort, setSort] = useState<Sort>("recent");
+
+  useEffect(() => {
+    if (!user) return;
+    let dead = false;
+    (async () => {
+      const m = new Map<string, number>();
+      try {
+        const token = (await getSupabase()?.auth.getSession())?.data.session?.access_token;
+        const r = token ? await fetch("/api/orders/mine", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }) : null;
+        const d = r?.ok ? await r.json() as { orders: { paidAt: string | null; keys: { slug: string }[] }[] } : null;
+        for (const o of d?.orders ?? []) for (const k of o.keys) m.set(k.slug, Math.max(m.get(k.slug) ?? 0, o.paidAt ? Date.parse(o.paidAt) : 0));
+      } catch { /* mạng lỗi: coi như chưa sở hữu game nào */ }
+      if (!dead) setOwned(m);
+    })();
+    return () => { dead = true; };
+  }, [user]);
+
+  const engines = useMemo(() => [...new Set((games ?? []).map((g) => g.engine))], [games]);
+  const view = useMemo(() => {
+    if (!games || !owned) return [];
+    const n = fold(q);
+    const out = games.filter((g) =>
+      (own === "all" || (own === "own") === owned.has(g.slug)) && (!engine || g.engine === engine) && (!n || fold(g.title).includes(n)));
+    if (sort === "name") out.sort((a, b) => a.title.localeCompare(b.title, "vi"));
+    if (sort === "recent") out.sort((a, b) => (owned.get(b.slug) ?? -1) - (owned.get(a.slug) ?? -1)); // sort ổn định: cùng điểm giữ thứ tự mới cập nhật
+    return out;
+  }, [games, owned, q, own, engine, sort]);
+
+  if (user === null) {
+    return <p className="glass rounded-3xl px-6 py-10 text-center text-haze">Bạn cần <Link href="/dang-nhap" className="font-medium text-berry hover:underline">đăng nhập</Link> để xem bộ sưu tập.</p>;
+  }
+  if (failed) return <p role="alert" className="text-haze">Không tải được danh sách game. Tải lại trang để thử lại.</p>;
+  if (!games || !owned) return <div aria-busy className="glass h-72 animate-pulse rounded-3xl" />;
+
+  const have = games.filter((g) => owned.has(g.slug)).length;
+  const seg = (k: Own, label: string, n: number) => (
+    <button key={k} type="button" aria-pressed={own === k} onClick={() => setOwn(k)}
+            className={`flex-1 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider transition ${own === k ? "bg-berry text-ink" : "text-mist/70 hover:bg-white/10"}`}>
+      {label}<span className="block text-[11px] tabular-nums opacity-70">{n}</span>
+    </button>
+  );
+  const lab = "mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.2em] text-haze";
+
+  return (
+    <div className="space-y-6 pb-24">
+      <PageHead eyebrow="Bộ sưu tập" title="Game của bạn"
+                desc="Những game bạn đã mua key, kèm lối tắt tới trang tải."
+                aside={<p className="text-sm tabular-nums text-haze">{have}/{games.length} game</p>} />
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_1.6fr_1fr_1fr]">
+        <label><span className={lab}>Tìm game</span>
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nhập tên game…" autoComplete="off" className={selectCls} /></label>
+        <div><span className={lab}>Trạng thái sở hữu</span>
+          <div role="group" className="flex overflow-hidden rounded-xl ring-1 ring-white/10">
+            {seg("own", "Đã sở hữu", have)}{seg("not", "Chưa sở hữu", games.length - have)}{seg("all", "Tất cả", games.length)}
+          </div></div>
+        <label><span className={lab}>Engine</span>
+          <select value={engine} onChange={(e) => setEngine(e.target.value)} className={selectCls}>
+            <option value="">Tất cả engine</option>{engines.map((e) => <option key={e}>{e}</option>)}
+          </select></label>
+        <label><span className={lab}>Sắp xếp</span>
+          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className={selectCls}>
+            <option value="recent">Mới sở hữu</option><option value="new">Mới cập nhật</option><option value="name">Tên A đến Z</option>
+          </select></label>
+      </div>
+
+      <GameTiles games={view} empty={own === "own" && have === 0 ? "Bạn chưa sở hữu game nào. Mua key ở trang game để mở khóa." : "Không có game nào khớp bộ lọc."} />
+    </div>
+  );
+}
+
+
+=== FILE: src/components/account/GameTiles.tsx ===
+
+"use client";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import Cover from "@/components/Cover";
+
+export type Meta = { slug: string; title: string; engine: string; version: string; tags: string[]; thumb: string };
+
+// Chỉ mục nhẹ /search-index.json (sắp theo ngày cập nhật mới nhất), tải một lần dùng chung cho các trang tài khoản.
+let pending: Promise<Meta[]> | null = null;
+const loadIndex = () => (pending ??= fetch("/search-index.json")
+  .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<Meta[]>; })
+  .catch((e) => { pending = null; throw e; }));
+
+export function useGameIndex() {
+  const [m, setM] = useState<Meta[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let dead = false;
+    loadIndex().then((x) => { if (!dead) setM(x); }, () => { if (!dead) setFailed(true); });
+    return () => { dead = true; };
+  }, []);
+  return { games: m, failed };
+}
+
+export const selectCls =
+  "w-full rounded-xl bg-white/[0.07] px-4 py-2.5 text-sm outline-none ring-1 ring-white/10 placeholder:text-haze focus:bg-white/10 focus-visible:ring-2 focus-visible:ring-berry";
+
+export function PageHead({ eyebrow, title, desc, aside }: { eyebrow: string; title: string; desc?: string; aside?: React.ReactNode }) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-6">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-berry">{eyebrow}</p>
+        <h1 className="mt-2 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h1>
+        {desc && <p className="mt-2 max-w-[58ch] text-sm leading-relaxed text-haze">{desc}</p>}
+      </div>
+      {aside}
+    </header>
+  );
+}
+
+export function GameTiles({ games, empty }: { games: Meta[]; empty: string }) {
+  if (games.length === 0) return <p className="glass rounded-3xl px-6 py-14 text-center text-sm text-haze">{empty}</p>;
+  return (
+    <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {games.map((g) => (
+        <li key={g.slug}>
+          <Link href={`/game/${g.slug}`} className="group block overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition duration-300 hover:-translate-y-1 hover:border-[#5eead4]/50">
+            <div className="relative aspect-video bg-plum">
+              <Cover src={g.thumb} title={g.title} engine={g.engine} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            </div>
+            <div className="p-3.5">
+              <p className="line-clamp-2 font-display text-base font-bold leading-snug">{g.title}</p>
+              <p className="mt-1 text-xs tabular-nums text-haze">{g.engine} · v{g.version}</p>
+            </div>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+
+=== FILE: src/components/account/Saved.tsx ===
+
+"use client";
+import { useState } from "react";
+import { useList } from "@/lib/user-lists";
+import { GameTiles, PageHead, useGameIndex } from "./GameTiles";
+
+// Yêu thích (đồng bộ tài khoản qua FavSync) + Đã xem (lưu theo trình duyệt). Chuyển từ menu người dùng vào đây.
+export default function Saved() {
+  const [tab, setTab] = useState<"fav" | "seen">("fav");
+  const fav = useList("fav");
+  const seen = useList("seen");
+  const { games, failed } = useGameIndex();
+  const list = tab === "fav" ? fav : seen;
+  const bySlug = new Map((games ?? []).map((g) => [g.slug, g]));
+  const shown = list.map((s) => bySlug.get(s)).filter((g): g is NonNullable<typeof g> => !!g); // bỏ game đã xóa; giữ thứ tự mới nhất trước
+
+  const btn = (k: "fav" | "seen", label: string, n: number) => (
+    <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 ${tab === k ? "bg-berry text-ink" : "bg-white/10 hover:bg-white/20"}`}>
+      {label} <span className="tabular-nums opacity-70">{n}</span>
+    </button>
+  );
+
+  return (
+    <div className="space-y-6 pb-24">
+      <PageHead eyebrow="Danh sách cá nhân" title="Yêu thích & Đã xem"
+                desc="Bấm biểu tượng tim trên thẻ game để lưu vào Yêu thích. Game bạn mở xem sẽ tự vào Đã xem." />
+      <div className="flex gap-2">{btn("fav", "Yêu thích", fav.length)}{btn("seen", "Đã xem", seen.length)}</div>
+      {failed ? <p role="alert" className="text-haze">Không tải được danh sách game.</p>
+        : !games ? <div aria-busy className="glass h-56 animate-pulse rounded-3xl" />
+        : <GameTiles games={shown} empty={tab === "fav" ? "Chưa có game yêu thích." : "Chưa xem game nào."} />}
+    </div>
+  );
 }
 
 
@@ -1398,8 +1658,9 @@ const num = "rounded-full bg-white/10 px-2 py-0.5 text-xs tabular-nums text-haze
 const item = "block w-full rounded-xl px-3 py-2 text-left text-sm text-mist/90 transition hover:bg-white/10";
 const itemRow = item.replace("block", "flex items-center justify-between");
 
-// Cạnh nút Tìm kiếm trên header. Chưa đăng nhập: nút 3 gạch, bấm ra Đăng nhập / Đăng ký.
-// Đã đăng nhập: chữ cái đầu + tên, bấm ra menu Đăng xuất. Chưa cấu hình Supabase thì không hiện gì (web chạy như cũ).
+// Cạnh nút Tìm kiếm trên header. Chưa đăng nhập: nút người dùng, bấm ra Đăng nhập / Đăng ký (kèm lối tắt Yêu thích / Đã xem).
+// Đã đăng nhập: chữ cái đầu + tên, bấm ra menu: Tài khoản, Key đã mua, Giỏ hàng, Đăng xuất.
+// Yêu thích / Đã xem của người đã đăng nhập nằm trong trang /tai-khoan/yeu-thich.
 export default function AccountMenu() {
   const user = useAuthUser();
   const [open, setOpen] = useState(false);
@@ -1422,6 +1683,16 @@ export default function AccountMenu() {
   if (user === undefined) return <span aria-hidden className="h-9 w-9 sm:h-10 sm:w-[7.5rem]" />;
 
   const name = user ? displayName(user) : "";
+  const lists = ([["fav", "Yêu thích", fav], ["seen", "Đã xem", seen]] as const).map(([k, label, n]) => (
+    <Link key={k} href={`/?list=${k}#kho-game`} role="menuitem"
+          onClick={(e) => { setOpen(false); softNav(e, pathname, `?list=${k}`, "library"); }}
+          className={itemRow}>
+      <span className="flex items-center gap-2"><span aria-hidden className={k === "fav" ? "text-red-500" : "text-sky-400"}>{k === "fav" ? "♥" : "●"}</span>{label}</span><span className={num}>{n}</span>
+    </Link>
+  ));
+  const donate = donateConfig.enabled && (
+    <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>
+  );
 
   return (
     <div ref={ref} className="relative">
@@ -1448,17 +1719,10 @@ export default function AccountMenu() {
             <>
               <p className="truncate px-3 py-2 text-sm font-semibold">{name}</p>
               <div className="my-1 border-t border-white/10" />
-              {([["fav", "Yêu thích", fav], ["seen", "Đã xem", seen]] as const).map(([k, label, n]) => (
-                <Link key={k} href={`/?list=${k}#kho-game`} role="menuitem"
-                      onClick={(e) => { setOpen(false); softNav(e, pathname, `?list=${k}`, "library"); }}
-                      className={itemRow}>
-                  <span className="flex items-center gap-2"><span aria-hidden className={k === "fav" ? "text-red-500" : "text-sky-400"}>{k === "fav" ? "♥" : "●"}</span>{label}</span><span className={num}>{n}</span>
-                </Link>
-              ))}
+              <Link href="/tai-khoan" role="menuitem" onClick={() => setOpen(false)} className={item}>Tài khoản</Link>
               <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>
-              <Link href="/tai-khoan/discord" role="menuitem" onClick={() => setOpen(false)} className={item}>Discord</Link>
               <Link href="/gio-hang" role="menuitem" onClick={() => setOpen(false)} className={item}>Giỏ hàng</Link>
-              {donateConfig.enabled && <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>}
+              {donate}
               <div className="my-1 border-t border-white/10" />
               <button type="button" role="menuitem" className={item}
                       onClick={() => { setOpen(false); void getSupabase()?.auth.signOut(); }}>
@@ -1470,16 +1734,10 @@ export default function AccountMenu() {
               <Link href="/dang-nhap" role="menuitem" onClick={() => setOpen(false)} className={item}>Đăng nhập</Link>
               <Link href="/dang-ky" role="menuitem" onClick={() => setOpen(false)} className={item}>Đăng ký</Link>
               <div className="my-1 border-t border-white/10" />
-              {([["fav", "Yêu thích", fav], ["seen", "Đã xem", seen]] as const).map(([k, label, n]) => (
-                <Link key={k} href={`/?list=${k}#kho-game`} role="menuitem"
-                      onClick={(e) => { setOpen(false); softNav(e, pathname, `?list=${k}`, "library"); }}
-                      className={itemRow}>
-                  <span className="flex items-center gap-2"><span aria-hidden className={k === "fav" ? "text-red-500" : "text-sky-400"}>{k === "fav" ? "♥" : "●"}</span>{label}</span><span className={num}>{n}</span>
-                </Link>
-              ))}
+              {lists}
               <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>
               <Link href="/gio-hang" role="menuitem" onClick={() => setOpen(false)} className={item}>Giỏ hàng</Link>
-              {donateConfig.enabled && <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>}
+              {donate}
             </>
           )}
         </div>
@@ -2743,6 +3001,8 @@ export default function Cover({ src, title, engine, className = "", priority, de
 "use client";
 import { useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
+import { LOGO } from "@/lib/logos";
+import { PageHead } from "@/components/account/GameTiles";
 
 type Status = { discord: { id: string; name: string; avatar: string | null; state: string } | null; purchases: number };
 
@@ -2756,8 +3016,15 @@ const NOTICE: Record<string, string> = {
   cooldown: "Thao tác quá nhanh, thử lại sau vài giây.",
   error: "Có lỗi khi liên kết, vui lòng thử lại.",
 };
+const STATE: Record<string, [string, string]> = {
+  ok: ["Đã có role khách hàng", "text-emerald-300"],
+  no_purchase: ["Chưa có role", "text-amber-200"],
+  not_in_guild: ["Chưa vào server", "text-amber-200"],
+  error: ["Đồng bộ lỗi", "text-red-300"],
+};
 
-const box = "glass rounded-3xl p-5";
+const box = "rounded-3xl border border-white/10 bg-white/[0.04] p-6";
+const eyebrow = "text-[11px] font-semibold uppercase tracking-[0.22em]";
 
 export default function DiscordLinkCard() {
   const [s, setS] = useState<Status | null>(null);
@@ -2798,40 +3065,83 @@ export default function DiscordLinkCard() {
     setBusy(false);
   }
 
+  const head = <PageHead eyebrow="Cộng đồng" title="Discord" desc="Liên kết để nhận role khách hàng trong server sau khi mua key. Mỗi tài khoản chỉ liên kết được một Discord." />;
   if (!s) {
-    if (out === "login") return <p className={`${box} text-sm text-haze`}>Đăng nhập để liên kết Discord và nhận role khách hàng.</p>;
-    if (out === "fail") return <p className={`${box} text-sm text-haze`}>Không tải được thông tin Discord. Tải lại trang để thử lại.</p>;
-    return <div className="glass h-28 animate-pulse rounded-3xl" />;
+    return <div className="space-y-6 pb-24">{head}
+      {out === "login" ? <p className={`${box} text-sm text-haze`}>Đăng nhập để liên kết Discord và nhận role khách hàng.</p>
+        : out === "fail" ? <p className={`${box} text-sm text-haze`}>Không tải được thông tin Discord. Tải lại trang để thử lại.</p>
+        : <div aria-busy className="h-40 animate-pulse rounded-3xl bg-white/[0.04]" />}
+    </div>;
   }
   const d = s.discord;
+  const [stTitle, stCls] = d ? STATE[d.state] ?? ["Chưa đồng bộ", "text-haze"] : ["Chưa liên kết", "text-haze"];
+  const btn = "shrink-0 rounded-full bg-[#5865F2] px-6 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#4752C4] active:scale-95 disabled:opacity-40";
 
   return (
-    <section className={box}>
-      <h2 className="font-display text-xl font-bold">Liên kết Discord</h2>
-      {d ? (
-        <div className="mt-3 flex items-center gap-3">
-          {d.avatar && (
+    <div className="space-y-6 pb-24">
+      {head}
+
+      {/* Thẻ liên kết: viền trái màu Discord, 3 cụm (danh tính · trạng thái · nút) */}
+      <section className={`${box} flex flex-wrap items-center gap-x-8 gap-y-5 border-l-4 border-l-[#5865F2]`}>
+        <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[#5865F2] text-white">
+          {d?.avatar
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={`https://cdn.discordapp.com/avatars/${d.id}/${d.avatar}.png?size=64`} alt="" className="size-10 rounded-full" />
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold text-mist">{d.name}</p>
-            <p className="text-sm text-haze">{NOTICE[d.state] ?? "Chưa đồng bộ."}</p>
-          </div>
-          <button type="button" onClick={() => act("sync")} disabled={busy} className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold transition hover:bg-white/20 active:scale-95 disabled:opacity-40">
-            Đồng bộ lại
-          </button>
+            ? <img src={`https://cdn.discordapp.com/avatars/${d.id}/${d.avatar}.png?size=96`} alt="" className="size-full object-cover" />
+            : <svg viewBox="0 0 24 24" className="size-7" fill="currentColor" aria-hidden><path d={LOGO.discord.d} /></svg>}
+        </span>
+        <div className="min-w-0 flex-1 basis-56">
+          <p className={`${eyebrow} text-[#8c96ff]`}>Liên kết Discord</p>
+          <h2 className="mt-1 font-display text-2xl font-extrabold tracking-tight">{d ? d.name : "Chưa liên kết"}</h2>
+          <p className="mt-1 text-sm leading-relaxed text-haze">
+            {d ? "Role được cấp tự động khi tài khoản có đơn key đã thanh toán." : "Mỗi tài khoản chỉ liên kết được một Discord và không tự gỡ được."}
+          </p>
         </div>
-      ) : (
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <p className="min-w-0 flex-1 text-sm text-haze">Liên kết để nhận role khách hàng trong server. Mỗi tài khoản chỉ liên kết được một Discord và không tự gỡ được.</p>
-          <button type="button" onClick={() => act("link")} disabled={busy} className="rounded-full bg-berry px-6 py-2.5 text-sm font-semibold text-ink transition hover:-translate-y-0.5 active:scale-95 disabled:opacity-40">
-            Liên kết Discord
-          </button>
+        <div className="basis-48">
+          <p className={`font-display text-lg font-bold ${stCls}`}>{stTitle}</p>
+          {d && <p className="mt-1 max-w-[30ch] text-xs leading-relaxed text-haze">{NOTICE[d.state] ?? "Bấm “Đồng bộ lại” để cập nhật."}</p>}
         </div>
-      )}
-      {msg && <p role="status" className="mt-3 text-sm text-emerald-300">{msg}</p>}
-    </section>
+        {d ? <button type="button" onClick={() => act("sync")} disabled={busy} className={btn}>Đồng bộ lại</button>
+           : <button type="button" onClick={() => act("link")} disabled={busy} className={btn}>Liên kết Discord</button>}
+      </section>
+
+      {/* Thẻ quyền lợi: số đơn key đã thanh toán (điều kiện để nhận role) */}
+      <section className={`${box} flex flex-wrap items-end justify-between gap-4`}>
+        <div className="max-w-[52ch]">
+          <p className={`${eyebrow} text-[#5eead4]`}>Quyền lợi · Role khách hàng</p>
+          <h2 className="mt-1 font-display text-2xl font-extrabold tracking-tight">Đơn key đã thanh toán</h2>
+          <p className="mt-2 text-sm leading-relaxed text-haze">Chỉ đơn mua khi đang đăng nhập mới được tính. Mua xong mở trang này, hệ thống tự cấp role nếu bạn đã liên kết.</p>
+        </div>
+        <p className="flex items-baseline gap-2">
+          <span className="bg-gradient-to-r from-[#5eead4] to-[#ee5a96] bg-clip-text font-display text-5xl font-extrabold tabular-nums text-transparent">{s.purchases}</span>
+          <span className={`${eyebrow} text-haze`}>đơn</span>
+        </p>
+      </section>
+
+      {msg && <p role="status" className="rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{msg}</p>}
+    </div>
+  );
+}
+
+
+=== FILE: src/components/DiscordRoleHint.tsx ===
+
+import Link from "next/link";
+import { LOGO } from "@/lib/logos";
+
+// Nhắc đồng bộ Discord ngay sau khi thanh toán key: bấm vào là sang trang liên kết (nơi cấp role khách hàng).
+export default function DiscordRoleHint() {
+  return (
+    <Link href="/tai-khoan/discord"
+          className="flex items-center gap-3 rounded-2xl border border-[#5865F2]/40 bg-[#5865F2]/10 px-4 py-3 text-left text-sm transition hover:bg-[#5865F2]/20">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#5865F2] text-white">
+        <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden><path d={LOGO.discord.d} /></svg>
+      </span>
+      <span className="min-w-0 flex-1">
+        <b className="block">Đồng bộ Discord để nhận role khách hàng</b>
+        <span className="text-xs text-haze">Bấm để liên kết tài khoản, role được cấp tự động sau khi mua key.</span>
+      </span>
+      <span aria-hidden className="text-lg text-[#8c96ff]">&rarr;</span>
+    </Link>
   );
 }
 
@@ -3639,6 +3949,7 @@ type Props = { brand: ReactNode; brandBig?: ReactNode; nav: ReactNode; tools: Re
  *  - header `fixed` + khối giữ chỗ tự đo chiều cao => nội dung không bị đẩy khi cuộn
  *  - thu nhỏ bằng transform/opacity, không đổi height
  *  - nền pill là màu ĐẶC (không trong suốt, không blur)
+ *  - từ xl, menu nằm CHÍNH GIỮA khi ở đầu trang (cụm công cụ đã nhấc lên hàng logo), cuộn xuống thì trượt về cạnh cụm công cụ
  */
 export default function HeaderShell({ brand, brandBig, nav, tools }: Props) {
   const ref = useRef<HTMLElement>(null);
@@ -3649,24 +3960,38 @@ export default function HeaderShell({ brand, brandBig, nav, tools }: Props) {
     if (!el) return;
     const big = el.querySelector<HTMLElement>("[data-big]");
     const small = el.querySelector<HTMLElement>("[data-small]");
+    const navEl = el.querySelector<HTMLElement>('nav[aria-label="Chính"]');
     const wide = window.matchMedia("(min-width: 768px)");
+    const xl = window.matchMedia("(min-width: 1280px)"); // cùng ngưỡng với xl:translate của cụm công cụ bên dưới
     let raf = 0;
     let last = -1;
+    let p = 0;
+
+    // Đẩy menu về giữa hàng ở đầu trang (p = 0), trả về vị trí tự nhiên khi đã thu nhỏ (p = 1).
+    // offsetLeft/offsetWidth không bị transform làm sai nên đo được vị trí tự nhiên của menu.
+    const place = () => {
+      if (!navEl) return;
+      const row = navEl.parentElement;
+      const nx = row && xl.matches ? row.offsetWidth / 2 - (navEl.offsetLeft + navEl.offsetWidth / 2) : 0;
+      navEl.style.transform = nx ? `translate3d(${Math.round(nx * (1 - p))}px,0,0)` : "";
+    };
 
     // Khối giữ chỗ = chiều cao thật của header (offsetHeight không bị transform làm sai).
     const sp = spacer.current;
-    const ro = new ResizeObserver(() => { if (sp) sp.style.height = el.offsetHeight + "px"; });
+    const ro = new ResizeObserver(() => { if (sp) sp.style.height = el.offsetHeight + "px"; place(); });
     ro.observe(el);
+    if (navEl) ro.observe(navEl); // font tải xong làm menu đổi bề rộng thì đo lại
 
     const update = () => {
       raf = 0;
       const raw = Math.min(1, Math.max(0, window.scrollY / RANGE));
-      const p = Math.round(raw * raw * (3 - 2 * raw) * 100) / 100; // easing smoothstep: mượt cả 2 chiều
-      if (p === last) return;
-      last = p;
+      const next = Math.round(raw * raw * (3 - 2 * raw) * 100) / 100; // easing smoothstep: mượt cả 2 chiều
+      if (next === last) return;
+      last = p = next;
       el.style.setProperty("--hp", String(p));
       big?.toggleAttribute("inert", raw >= 0.6);
       small?.toggleAttribute("inert", wide.matches && raw < 0.6);
+      place();
     };
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
     const onWide = () => { last = -1; update(); };
@@ -3674,9 +3999,11 @@ export default function HeaderShell({ brand, brandBig, nav, tools }: Props) {
     update();
     window.addEventListener("scroll", onScroll, { passive: true });
     wide.addEventListener("change", onWide);
+    xl.addEventListener("change", onWide);
     return () => {
       window.removeEventListener("scroll", onScroll);
       wide.removeEventListener("change", onWide);
+      xl.removeEventListener("change", onWide);
       ro.disconnect();
       if (raf) cancelAnimationFrame(raf);
     };
@@ -4809,6 +5136,7 @@ export default function PayDonate() {
 "use client";
 import { useState } from "react";
 import { site } from "@/data/site";
+import { LOGO } from "@/lib/logos";
 import { useModal } from "@/lib/use-modal";
 import { useAgeOk } from "./AgeGate";
 
@@ -4817,10 +5145,29 @@ import { useAgeOk } from "./AgeGate";
 const cfg = (site as unknown as { popup?: { enabled?: boolean; title?: string; text?: string } }).popup;
 const text = (cfg?.text ?? "").trim();
 const title = (cfg?.title ?? "").trim() || "Thông báo";
+const SNOOZE_KEY = "gsvh-popup-snooze";
+const DAY = 24 * 60 * 60 * 1000;
+// Dấu vân tay nội dung: admin sửa tiêu đề/nội dung thì mã đổi => lời "tắt 24h" cũ của người dùng tự vô hiệu, họ phải bấm lại.
+const sig = `${title}\n${text}\n${site.discord}\n${site.facebook}`.split("").reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7).toString(36);
+function snoozed() {
+  try {
+    const v = JSON.parse(localStorage.getItem(SNOOZE_KEY) ?? "null") as { sig?: string; until?: number } | null;
+    return !!v && v.sig === sig && typeof v.until === "number" && v.until > Date.now();
+  } catch { return false; }
+}
+function snooze() {
+  try { localStorage.setItem(SNOOZE_KEY, JSON.stringify({ sig, until: Date.now() + DAY })); } catch { /* chế độ riêng tư: bỏ qua, lần sau hiện lại */ }
+}
+const isUrl = (u: string) => /^https?:\/\//i.test(u);
+
+const CHANNELS = [
+  { id: "discord", url: site.discord, label: site.nav.discord, ...LOGO.discord },
+  { id: "facebook", url: site.facebook, label: site.nav.facebook, ...LOGO.facebook },
+].filter((c) => isUrl(c.url));
 
 export default function PopupNotice() {
   const ageOk = useAgeOk();
-  const [closed, setClosed] = useState(false);
+  const [closed, setClosed] = useState(snoozed); // lazy init chỉ chạy ở client; popup chỉ mở sau khi qua cổng 18+ nên không lệch hydration
   // Có cổng 18+ thì đợi người dùng qua cổng rồi mới hiện (tránh hai hộp thoại tranh focus)
   const open = Boolean(cfg?.enabled && text) && !closed && (!site.ageGate.enabled || ageOk);
   const ref = useModal(open, () => setClosed(true));
@@ -4829,14 +5176,49 @@ export default function PopupNotice() {
   return (
     <div className="anim-fade fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-ink/85 p-4" onClick={() => setClosed(true)}>
       <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="popup-title"
-           className="glass anim-pop w-full max-w-md rounded-[2rem] p-6 text-center shadow-2xl shadow-black/50 outline-none sm:p-8"
+           className="anim-pop relative w-full max-w-xl overflow-hidden rounded-[2rem] border border-white/10 bg-[#14101f] shadow-2xl shadow-black/60 outline-none"
            onClick={(e) => e.stopPropagation()}>
-        <h2 id="popup-title" className="font-display text-2xl font-extrabold tracking-tight text-balance">{title}</h2>
-        <p className="mt-4 whitespace-pre-line text-left leading-relaxed text-mist/85">{text}</p>
-        <button type="button" data-autofocus onClick={() => setClosed(true)}
-                className="mt-6 w-full rounded-full bg-berry px-7 py-3 font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95">
-          Đã hiểu
+        {/* Dải sáng trang trí phía trên */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(60%_100%_at_50%_0%,rgba(238,90,150,0.28),transparent)]" />
+        <div aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#5eead4] via-[#ee5a96] to-[#5865F2]" />
+
+        <button type="button" onClick={() => setClosed(true)} aria-label="Đóng"
+                className="absolute right-4 top-4 grid size-9 place-items-center rounded-full text-haze transition hover:bg-white/10 hover:text-white">
+          <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
         </button>
+
+        <div className="relative px-6 pb-7 pt-9 sm:px-10 sm:pt-11">
+          <p className="text-center text-[11px] font-semibold uppercase tracking-[0.28em] text-[#5eead4]">Thông báo từ {site.name}</p>
+          <h2 id="popup-title" className="mt-3 text-balance text-center font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h2>
+          <div aria-hidden className="mx-auto mt-5 h-px w-24 bg-gradient-to-r from-transparent via-berry/70 to-transparent" />
+
+          <p className="mt-6 max-h-[40vh] overflow-y-auto whitespace-pre-line text-left text-base leading-relaxed text-mist/90 sm:text-[17px]">{text}</p>
+
+          {CHANNELS.length > 0 && (
+            <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-center text-sm text-haze">Gặp link lỗi hoặc cần hỗ trợ? Báo ngay tại</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {CHANNELS.map((c) => (
+                  <a key={c.id} href={c.url} target="_blank" rel="noopener noreferrer"
+                     className="flex items-center justify-center gap-2.5 rounded-full px-5 py-3 font-semibold text-white shadow-lg shadow-black/30 transition hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+                     style={{ background: c.color }}>
+                    <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden><path d={c.d} /></svg>
+                    {c.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button type="button" data-autofocus onClick={() => setClosed(true)}
+                  className="mt-5 w-full rounded-full bg-berry px-7 py-3.5 font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95">
+            Đã hiểu
+          </button>
+          <button type="button" onClick={() => { snooze(); setClosed(true); }}
+                  className="mt-2 w-full rounded-full px-7 py-2.5 text-sm text-haze transition hover:bg-white/5 hover:text-white">
+            Không hiện lại trong 24 giờ
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -5669,7 +6051,7 @@ export const games: Game[] = (data as unknown as Raw[]).map(({ description, ...g
   "name": "GSVH",
   "url": "https://gsvhvn.vercel.app",
   "description": "Danh sách game và hướng dẫn cài đặt.",
-  "discord": "https://discord.gg/",
+  "discord": "https://discord.gg/ySReHvt3v",
   "facebook": "https://www.facebook.com/profile.php?id=61591215583142",
   "footer": "© 2026 GSVH",
   "tagline": "",
