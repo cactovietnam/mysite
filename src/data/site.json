@@ -37,7 +37,7 @@
     "transferContent": "Ten nguoi gui + game muon dich"
   },
   "popup": {
-    "enabled": false,
+    "enabled": true,
     "title": "Mới!!!",
     "text": "Anh em tạo tải khoản trước khi tải game nhé! \n anh em thấy ổn có thể cho mình xin 2 5k ở phần donate nha"
   },
