@@ -15,6 +15,7 @@ type Props = { brand: ReactNode; brandBig?: ReactNode; nav: ReactNode; tools: Re
  *  - header `fixed` + khối giữ chỗ tự đo chiều cao => nội dung không bị đẩy khi cuộn
  *  - thu nhỏ bằng transform/opacity, không đổi height
  *  - nền pill là màu ĐẶC (không trong suốt, không blur)
+ *  - từ xl, menu nằm CHÍNH GIỮA khi ở đầu trang (cụm công cụ đã nhấc lên hàng logo), cuộn xuống thì trượt về cạnh cụm công cụ
  */
 export default function HeaderShell({ brand, brandBig, nav, tools }: Props) {
   const ref = useRef<HTMLElement>(null);
@@ -25,24 +26,38 @@ export default function HeaderShell({ brand, brandBig, nav, tools }: Props) {
     if (!el) return;
     const big = el.querySelector<HTMLElement>("[data-big]");
     const small = el.querySelector<HTMLElement>("[data-small]");
+    const navEl = el.querySelector<HTMLElement>('nav[aria-label="Chính"]');
     const wide = window.matchMedia("(min-width: 768px)");
+    const xl = window.matchMedia("(min-width: 1280px)"); // cùng ngưỡng với xl:translate của cụm công cụ bên dưới
     let raf = 0;
     let last = -1;
+    let p = 0;
+
+    // Đẩy menu về giữa hàng ở đầu trang (p = 0), trả về vị trí tự nhiên khi đã thu nhỏ (p = 1).
+    // offsetLeft/offsetWidth không bị transform làm sai nên đo được vị trí tự nhiên của menu.
+    const place = () => {
+      if (!navEl) return;
+      const row = navEl.parentElement;
+      const nx = row && xl.matches ? row.offsetWidth / 2 - (navEl.offsetLeft + navEl.offsetWidth / 2) : 0;
+      navEl.style.transform = nx ? `translate3d(${Math.round(nx * (1 - p))}px,0,0)` : "";
+    };
 
     // Khối giữ chỗ = chiều cao thật của header (offsetHeight không bị transform làm sai).
     const sp = spacer.current;
-    const ro = new ResizeObserver(() => { if (sp) sp.style.height = el.offsetHeight + "px"; });
+    const ro = new ResizeObserver(() => { if (sp) sp.style.height = el.offsetHeight + "px"; place(); });
     ro.observe(el);
+    if (navEl) ro.observe(navEl); // font tải xong làm menu đổi bề rộng thì đo lại
 
     const update = () => {
       raf = 0;
       const raw = Math.min(1, Math.max(0, window.scrollY / RANGE));
-      const p = Math.round(raw * raw * (3 - 2 * raw) * 100) / 100; // easing smoothstep: mượt cả 2 chiều
-      if (p === last) return;
-      last = p;
+      const next = Math.round(raw * raw * (3 - 2 * raw) * 100) / 100; // easing smoothstep: mượt cả 2 chiều
+      if (next === last) return;
+      last = p = next;
       el.style.setProperty("--hp", String(p));
       big?.toggleAttribute("inert", raw >= 0.6);
       small?.toggleAttribute("inert", wide.matches && raw < 0.6);
+      place();
     };
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
     const onWide = () => { last = -1; update(); };
@@ -50,9 +65,11 @@ export default function HeaderShell({ brand, brandBig, nav, tools }: Props) {
     update();
     window.addEventListener("scroll", onScroll, { passive: true });
     wide.addEventListener("change", onWide);
+    xl.addEventListener("change", onWide);
     return () => {
       window.removeEventListener("scroll", onScroll);
       wide.removeEventListener("change", onWide);
+      xl.removeEventListener("change", onWide);
       ro.disconnect();
       if (raf) cancelAnimationFrame(raf);
     };
