@@ -12,8 +12,9 @@ const num = "rounded-full bg-white/10 px-2 py-0.5 text-xs tabular-nums text-haze
 const item = "block w-full rounded-xl px-3 py-2 text-left text-sm text-mist/90 transition hover:bg-white/10";
 const itemRow = item.replace("block", "flex items-center justify-between");
 
-// Cạnh nút Tìm kiếm trên header. Chưa đăng nhập: nút 3 gạch, bấm ra Đăng nhập / Đăng ký.
-// Đã đăng nhập: chữ cái đầu + tên, bấm ra menu Đăng xuất. Chưa cấu hình Supabase thì không hiện gì (web chạy như cũ).
+// Cạnh nút Tìm kiếm trên header. Chưa đăng nhập: nút người dùng, bấm ra Đăng nhập / Đăng ký (kèm lối tắt Yêu thích / Đã xem).
+// Đã đăng nhập: chữ cái đầu + tên, bấm ra menu: Tài khoản, Key đã mua, Giỏ hàng, Đăng xuất.
+// Yêu thích / Đã xem của người đã đăng nhập nằm trong trang /tai-khoan/yeu-thich.
 export default function AccountMenu() {
   const user = useAuthUser();
   const [open, setOpen] = useState(false);
@@ -36,6 +37,16 @@ export default function AccountMenu() {
   if (user === undefined) return <span aria-hidden className="h-9 w-9 sm:h-10 sm:w-[7.5rem]" />;
 
   const name = user ? displayName(user) : "";
+  const lists = ([["fav", "Yêu thích", fav], ["seen", "Đã xem", seen]] as const).map(([k, label, n]) => (
+    <Link key={k} href={`/?list=${k}#kho-game`} role="menuitem"
+          onClick={(e) => { setOpen(false); softNav(e, pathname, `?list=${k}`, "library"); }}
+          className={itemRow}>
+      <span className="flex items-center gap-2"><span aria-hidden className={k === "fav" ? "text-red-500" : "text-sky-400"}>{k === "fav" ? "♥" : "●"}</span>{label}</span><span className={num}>{n}</span>
+    </Link>
+  ));
+  const donate = donateConfig.enabled && (
+    <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>
+  );
 
   return (
     <div ref={ref} className="relative">
@@ -62,16 +73,10 @@ export default function AccountMenu() {
             <>
               <p className="truncate px-3 py-2 text-sm font-semibold">{name}</p>
               <div className="my-1 border-t border-white/10" />
-              {([["fav", "Yêu thích", fav], ["seen", "Đã xem", seen]] as const).map(([k, label, n]) => (
-                <Link key={k} href={`/?list=${k}#kho-game`} role="menuitem"
-                      onClick={(e) => { setOpen(false); softNav(e, pathname, `?list=${k}`, "library"); }}
-                      className={itemRow}>
-                  <span className="flex items-center gap-2"><span aria-hidden className={k === "fav" ? "text-red-500" : "text-sky-400"}>{k === "fav" ? "♥" : "●"}</span>{label}</span><span className={num}>{n}</span>
-                </Link>
-              ))}
+              <Link href="/tai-khoan" role="menuitem" onClick={() => setOpen(false)} className={item}>Tài khoản</Link>
               <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>
               <Link href="/gio-hang" role="menuitem" onClick={() => setOpen(false)} className={item}>Giỏ hàng</Link>
-              {donateConfig.enabled && <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>}
+              {donate}
               <div className="my-1 border-t border-white/10" />
               <button type="button" role="menuitem" className={item}
                       onClick={() => { setOpen(false); void getSupabase()?.auth.signOut(); }}>
@@ -83,16 +88,10 @@ export default function AccountMenu() {
               <Link href="/dang-nhap" role="menuitem" onClick={() => setOpen(false)} className={item}>Đăng nhập</Link>
               <Link href="/dang-ky" role="menuitem" onClick={() => setOpen(false)} className={item}>Đăng ký</Link>
               <div className="my-1 border-t border-white/10" />
-              {([["fav", "Yêu thích", fav], ["seen", "Đã xem", seen]] as const).map(([k, label, n]) => (
-                <Link key={k} href={`/?list=${k}#kho-game`} role="menuitem"
-                      onClick={(e) => { setOpen(false); softNav(e, pathname, `?list=${k}`, "library"); }}
-                      className={itemRow}>
-                  <span className="flex items-center gap-2"><span aria-hidden className={k === "fav" ? "text-red-500" : "text-sky-400"}>{k === "fav" ? "♥" : "●"}</span>{label}</span><span className={num}>{n}</span>
-                </Link>
-              ))}
+              {lists}
               <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>
               <Link href="/gio-hang" role="menuitem" onClick={() => setOpen(false)} className={item}>Giỏ hàng</Link>
-              {donateConfig.enabled && <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>}
+              {donate}
             </>
           )}
         </div>

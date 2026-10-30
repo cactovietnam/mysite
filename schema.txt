@@ -1,0 +1,82 @@
+| schema                                                                               |
+| ------------------------------------------------------------------------------------ |
+| FUNCTION admin_revoke_sessions(p_user uuid)                                          |
+| FUNCTION handle_new_user()                                                           |
+| FUNCTION login_begin(p_user text, p_max integer, p_lock_minutes integer)             |
+| FUNCTION login_refund(p_user text)                                                   |
+| FUNCTION process_bank_tx(p_tx_id text, p_amount bigint, p_content text, p_raw jsonb) |
+| FUNCTION username_taken(name text)                                                   |
+| admin_audit.action text not null                                                     |
+| admin_audit.admin_id uuid not null                                                   |
+| admin_audit.at timestamp with time zone not null                                     |
+| admin_audit.id bigint not null                                                       |
+| admin_audit.target_id uuid                                                           |
+| admin_audit.target_username text                                                     |
+| admins.created_at timestamp with time zone not null                                  |
+| admins.user_id uuid not null                                                         |
+| app_settings.key text not null                                                       |
+| app_settings.updated_at timestamp with time zone not null                            |
+| app_settings.value jsonb not null                                                    |
+| bank_transactions.amount bigint not null                                             |
+| bank_transactions.content text not null                                              |
+| bank_transactions.created_at timestamp with time zone not null                       |
+| bank_transactions.id uuid not null                                                   |
+| bank_transactions.order_id uuid                                                      |
+| bank_transactions.provider_tx_id text not null                                       |
+| bank_transactions.raw jsonb                                                          |
+| bank_transactions.result text not null                                               |
+| discord_links.discord_avatar text                                                    |
+| discord_links.discord_id text not null                                               |
+| discord_links.discord_username text not null                                         |
+| discord_links.linked_at timestamp with time zone not null                            |
+| discord_links.sync_state text not null                                               |
+| discord_links.synced_at timestamp with time zone                                     |
+| discord_links.user_id uuid not null                                                  |
+| discord_oauth_state.expires_at timestamp with time zone not null                     |
+| discord_oauth_state.state text not null                                              |
+| discord_oauth_state.user_id uuid not null                                            |
+| error_logs.alerted boolean not null                                                  |
+| error_logs.created_at timestamp with time zone not null                              |
+| error_logs.fingerprint text not null                                                 |
+| error_logs.id bigint not null                                                        |
+| error_logs.message text not null                                                     |
+| error_logs.meta jsonb not null                                                       |
+| error_logs.notified jsonb not null                                                   |
+| error_logs.path text                                                                 |
+| error_logs.source text not null                                                      |
+| error_logs.stack text                                                                |
+| favorites.created_at timestamp with time zone not null                               |
+| favorites.slug text not null                                                         |
+| favorites.user_id uuid not null                                                      |
+| game_keys.enabled boolean not null                                                   |
+| game_keys.fee integer not null                                                       |
+| game_keys.password text not null                                                     |
+| game_keys.price integer not null                                                     |
+| game_keys.slug text not null                                                         |
+| game_keys.updated_at timestamp with time zone not null                               |
+| login_state.failed_attempts integer not null                                         |
+| login_state.locked_at timestamp with time zone                                       |
+| login_state.updated_at timestamp with time zone not null                             |
+| login_state.username_lc text not null                                                |
+| order_items.fee integer not null                                                     |
+| order_items.id uuid not null                                                         |
+| order_items.order_id uuid not null                                                   |
+| order_items.price integer not null                                                   |
+| order_items.slug text not null                                                       |
+| orders.amount integer not null                                                       |
+| orders.code text not null                                                            |
+| orders.created_at timestamp with time zone not null                                  |
+| orders.expires_at timestamp with time zone not null                                  |
+| orders.id uuid not null                                                              |
+| orders.kind text not null                                                            |
+| orders.note text not null                                                            |
+| orders.paid_amount integer                                                           |
+| orders.paid_at timestamp with time zone                                              |
+| orders.status text not null                                                          |
+| orders.suffix integer not null                                                       |
+| orders.token text not null                                                           |
+| orders.tx_id uuid                                                                    |
+| orders.user_id uuid                                                                  |
+| profiles.created_at timestamp with time zone not null                                |
+| profiles.id uuid not null                                                            |
+| profiles.username text not null                                                      |

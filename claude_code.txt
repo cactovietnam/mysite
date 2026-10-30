@@ -174,6 +174,123 @@ export async function POST(req: Request) {
 }
 
 
+=== FILE: src/app/api/discord/callback/route.ts ===
+
+import { adminClient } from "@/lib/auth-server";
+import { reportError } from "@/lib/notify";
+import { ACCOUNT_PATH, exchangeCode, syncRole } from "@/lib/discord";
+
+// Discord chuyển trình duyệt về đây (điều hướng từ site khác nên KHÔNG dùng sameOrigin; an toàn nhờ state + cookie).
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const state = url.searchParams.get("state");
+  const code = url.searchParams.get("code");
+  const back = (result: string) =>
+    new Response(null, {
+      status: 302,
+      headers: { Location: `${url.origin}${ACCOUNT_PATH}?discord=${result}`, "Set-Cookie": "dc_state=; Max-Age=0; Path=/api/discord; HttpOnly; SameSite=Lax" },
+    });
+
+  // state phải khớp cookie của chính trình duyệt này
+  const cookie = req.headers.get("cookie")?.match(/(?:^|; )dc_state=([^;]+)/)?.[1];
+  if (!code || !state || state !== cookie) return back(url.searchParams.get("error") ? "cancelled" : "error");
+
+  try {
+    const db = adminClient();
+    // xóa + trả về trong 1 lệnh: state chỉ dùng được đúng 1 lần
+    const { data: st } = await db.from("discord_oauth_state").delete().eq("state", state).gt("expires_at", new Date().toISOString()).select("user_id").maybeSingle();
+    if (!st) return back("error");
+    const userId: string = st.user_id;
+
+    const { token, me } = await exchangeCode(code);
+    const { data: cur } = await db.from("discord_links").select("discord_id").eq("user_id", userId).maybeSingle();
+    if (cur && cur.discord_id !== me.id) return back("already_linked");
+    if (!cur) {
+      const { error } = await db.from("discord_links").insert({
+        user_id: userId,
+        discord_id: me.id,
+        discord_username: me.global_name ?? me.username,
+        discord_avatar: me.avatar,
+      });
+      if (error) return back(error.code === "23505" ? "discord_taken" : "error"); // Discord này đã gắn với tài khoản khác
+    }
+    return back(await syncRole(userId, token));
+  } catch (e) {
+    await reportError(e, { source: "server", path: "/api/discord/callback", method: "GET" });
+    return back("error");
+  }
+}
+
+
+=== FILE: src/app/api/discord/route.ts ===
+
+import { randomBytes } from "node:crypto";
+import { adminClient, sameOrigin } from "@/lib/auth-server";
+import { json } from "@/lib/admin-guard";
+import { reportError } from "@/lib/notify";
+import { authorizeUrl, syncRole, userIdFromRequest } from "@/lib/discord";
+
+// GET (Bearer token): trạng thái liên kết Discord của tài khoản đang đăng nhập.
+// Tự đồng bộ: đã liên kết + có đơn key đã thanh toán mà role chưa cấp => cấp ngay (khách vừa mua xong mở trang là có role, không cần sửa webhook).
+export async function GET(req: Request) {
+  if (!sameOrigin(req)) return json({ code: "forbidden" }, 403);
+  const uid = await userIdFromRequest(req);
+  if (!uid) return json({ code: "unauthorized" }, 401);
+  try {
+    const db = adminClient();
+    const [link, orders] = await Promise.all([
+      db.from("discord_links").select("discord_id,discord_username,discord_avatar,sync_state,synced_at").eq("user_id", uid).maybeSingle(),
+      db.from("orders").select("id", { count: "exact", head: true }).eq("user_id", uid).eq("kind", "key").eq("status", "paid"),
+    ]);
+    if (link.error) throw link.error;
+    const purchases = orders.count ?? 0;
+    const d = link.data;
+    let state: string | undefined = d?.sync_state;
+    if (d && purchases > 0 && state !== "ok" && (!d.synced_at || Date.now() - Date.parse(d.synced_at) > 30_000)) state = await syncRole(uid);
+    return json({ discord: d && { id: d.discord_id, name: d.discord_username, avatar: d.discord_avatar, state }, purchases });
+  } catch (e) {
+    await reportError(e, { source: "server", path: "/api/discord", method: "GET" });
+    return json({ code: "error" }, 500);
+  }
+}
+
+/** POST {action:"link"} -> trả URL Discord để chuyển hướng | POST {action:"sync"} -> cấp lại role. */
+export async function POST(req: Request) {
+  if (!sameOrigin(req)) return json({ code: "forbidden" }, 403);
+  const uid = await userIdFromRequest(req);
+  if (!uid) return json({ code: "unauthorized" }, 401);
+  try {
+    const { action } = await req.json().catch(() => ({}));
+    const db = adminClient();
+    const { data: link } = await db.from("discord_links").select("synced_at").eq("user_id", uid).maybeSingle();
+
+    if (action === "link") {
+      if (link) return json({ code: "already_linked" }, 409);
+      const now = new Date();
+      await db.from("discord_oauth_state").delete().lt("expires_at", now.toISOString());
+      const state = randomBytes(24).toString("base64url");
+      const { error } = await db.from("discord_oauth_state").insert({ state, user_id: uid, expires_at: new Date(+now + 10 * 60_000).toISOString() });
+      if (error) throw error;
+      // cookie gắn state vào đúng trình duyệt này: chặn việc dụ người khác bấm link ủy quyền của kẻ xấu
+      const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+      return new Response(JSON.stringify({ url: authorizeUrl(state).toString() }), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "Set-Cookie": `dc_state=${state}; Max-Age=600; Path=/api/discord; HttpOnly; SameSite=Lax${secure}` },
+      });
+    }
+
+    if (action === "sync") {
+      if (!link) return json({ code: "not_linked" }, 409);
+      if (link.synced_at && Date.now() - Date.parse(link.synced_at) < 15_000) return json({ code: "cooldown" }, 429); // tránh dội rate limit Discord
+      return json({ state: await syncRole(uid) });
+    }
+    return json({ code: "bad_action" }, 400);
+  } catch (e) {
+    await reportError(e, { source: "server", path: "/api/discord", method: "POST" });
+    return json({ code: "error" }, 500);
+  }
+}
+
+
 === FILE: src/app/api/download/route.ts ===
 
 import { adminClient, sameOrigin } from "@/lib/auth-server";
@@ -1216,15 +1333,44 @@ export default function sitemap(): MetadataRoute.Sitemap {
 }
 
 
+=== FILE: src/app/tai-khoan/discord/page.tsx ===
+
+import type { Metadata } from "next";
+import AccountTabs from "@/components/AccountTabs";
+import DiscordLinkCard from "@/components/DiscordLinkCard";
+
+export const metadata: Metadata = { title: "Liên kết Discord", robots: { index: false, follow: false } };
+
+export default function Page() {
+  return (
+    <>
+      <AccountTabs />
+      <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-8 sm:pt-12">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-berry">Tài khoản</p>
+        <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">Discord</h1>
+        <p className="mt-3 max-w-[60ch] text-haze">Liên kết tài khoản này với Discord để nhận role khách hàng trong server sau khi mua key. Mỗi tài khoản chỉ liên kết được một Discord.</p>
+        <div className="mt-8"><DiscordLinkCard /></div>
+      </main>
+    </>
+  );
+}
+
+
 === FILE: src/app/tai-khoan/key/page.tsx ===
 
 import type { Metadata } from "next";
 import KeyVault from "@/components/KeyVault";
+import AccountTabs from "@/components/AccountTabs";
 
 export const metadata: Metadata = { title: "Key đã mua", robots: { index: false, follow: false } };
 
 export default function Page() {
-  return <KeyVault />;
+  return (
+    <>
+      <AccountTabs />
+      <KeyVault />
+    </>
+  );
 }
 
 
@@ -1310,6 +1456,7 @@ export default function AccountMenu() {
                 </Link>
               ))}
               <Link href="/tai-khoan/key" role="menuitem" onClick={() => setOpen(false)} className={item}>Key đã mua</Link>
+              <Link href="/tai-khoan/discord" role="menuitem" onClick={() => setOpen(false)} className={item}>Discord</Link>
               <Link href="/gio-hang" role="menuitem" onClick={() => setOpen(false)} className={item}>Giỏ hàng</Link>
               {donateConfig.enabled && <Link href="/donate" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-berry min-[400px]:hidden`}>{donateNavLabel}</Link>}
               <div className="my-1 border-t border-white/10" />
@@ -1338,6 +1485,38 @@ export default function AccountMenu() {
         </div>
       )}
     </div>
+  );
+}
+
+
+=== FILE: src/components/AccountTabs.tsx ===
+
+"use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useList } from "@/lib/user-lists";
+
+const tab = "flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95";
+const num = "rounded-full bg-white/10 px-2 py-0.5 text-xs tabular-nums text-haze";
+
+// Thanh tab của khu Tài khoản. Yêu thích / Đã xem là bộ lọc trong kho game nên dẫn về trang chủ, giống menu tên người dùng.
+export default function AccountTabs() {
+  const pathname = usePathname();
+  const fav = useList("fav").length;
+  const seen = useList("seen").length;
+  const cls = (on: boolean) => `${tab} ${on ? "bg-berry text-ink" : "bg-white/10 text-mist hover:bg-white/20"}`;
+  const page = (href: string, label: string) => (
+    <Link href={href} aria-current={pathname === href ? "page" : undefined} className={cls(pathname === href)}>{label}</Link>
+  );
+  return (
+    <nav aria-label="Tài khoản" className="mx-auto w-full max-w-5xl px-4 pt-8 sm:pt-12">
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {page("/tai-khoan/key", "Key đã mua")}
+        <Link href="/?list=fav#kho-game" className={cls(false)}>Yêu thích <span className={num}>{fav}</span></Link>
+        <Link href="/?list=seen#kho-game" className={cls(false)}>Đã xem <span className={num}>{seen}</span></Link>
+        {page("/tai-khoan/discord", "Discord")}
+      </div>
+    </nav>
   );
 }
 
@@ -2555,6 +2734,104 @@ export default function Cover({ src, title, engine, className = "", priority, de
       onError={() => setFailed(true)}
       className={className}
     />
+  );
+}
+
+
+=== FILE: src/components/DiscordLinkCard.tsx ===
+
+"use client";
+import { useEffect, useState } from "react";
+import { getSupabase } from "@/lib/supabase";
+
+type Status = { discord: { id: string; name: string; avatar: string | null; state: string } | null; purchases: number };
+
+const NOTICE: Record<string, string> = {
+  ok: "Đã liên kết, role khách hàng đã được cấp.",
+  no_purchase: "Đã liên kết. Role sẽ được cấp khi bạn mua key bằng tài khoản này (đơn mua lúc chưa đăng nhập không được tính).",
+  not_in_guild: "Đã liên kết nhưng bạn chưa ở trong server Discord. Vào server rồi bấm “Đồng bộ lại”.",
+  already_linked: "Tài khoản này đã liên kết với một Discord khác.",
+  discord_taken: "Discord này đã được liên kết với một tài khoản web khác.",
+  cancelled: "Bạn đã hủy liên kết.",
+  cooldown: "Thao tác quá nhanh, thử lại sau vài giây.",
+  error: "Có lỗi khi liên kết, vui lòng thử lại.",
+};
+
+const box = "glass rounded-3xl p-5";
+
+export default function DiscordLinkCard() {
+  const [s, setS] = useState<Status | null>(null);
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [out, setOut] = useState<"" | "login" | "fail">("");
+
+  async function call(init?: RequestInit) {
+    const token = (await getSupabase()?.auth.getSession())?.data.session?.access_token;
+    if (!token) return null;
+    const r = await fetch("/api/discord", { ...init, cache: "no-store", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } });
+    return { ok: r.ok, data: await r.json().catch(() => ({})) };
+  }
+
+  async function load() {
+    try {
+      const r = await call();
+      if (!r) return setOut("login");
+      if (r.ok) { setS(r.data); setOut(""); } else setOut("fail");
+    } catch { setOut("fail"); }
+  }
+
+  useEffect(() => {
+    const p = new URLSearchParams(location.search).get("discord");
+    if (p) { setMsg(NOTICE[p] ?? ""); history.replaceState(null, "", location.pathname); }
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function act(action: "link" | "sync") {
+    setBusy(true);
+    try {
+      const r = await call({ method: "POST", body: JSON.stringify({ action }) });
+      if (r?.ok && r.data.url) { location.href = r.data.url; return; }
+      setMsg(NOTICE[r ? (r.ok ? r.data.state : r.data.code) : "error"] ?? NOTICE.error);
+      await load();
+    } catch { setMsg(NOTICE.error); }
+    setBusy(false);
+  }
+
+  if (!s) {
+    if (out === "login") return <p className={`${box} text-sm text-haze`}>Đăng nhập để liên kết Discord và nhận role khách hàng.</p>;
+    if (out === "fail") return <p className={`${box} text-sm text-haze`}>Không tải được thông tin Discord. Tải lại trang để thử lại.</p>;
+    return <div className="glass h-28 animate-pulse rounded-3xl" />;
+  }
+  const d = s.discord;
+
+  return (
+    <section className={box}>
+      <h2 className="font-display text-xl font-bold">Liên kết Discord</h2>
+      {d ? (
+        <div className="mt-3 flex items-center gap-3">
+          {d.avatar && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={`https://cdn.discordapp.com/avatars/${d.id}/${d.avatar}.png?size=64`} alt="" className="size-10 rounded-full" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold text-mist">{d.name}</p>
+            <p className="text-sm text-haze">{NOTICE[d.state] ?? "Chưa đồng bộ."}</p>
+          </div>
+          <button type="button" onClick={() => act("sync")} disabled={busy} className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold transition hover:bg-white/20 active:scale-95 disabled:opacity-40">
+            Đồng bộ lại
+          </button>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <p className="min-w-0 flex-1 text-sm text-haze">Liên kết để nhận role khách hàng trong server. Mỗi tài khoản chỉ liên kết được một Discord và không tự gỡ được.</p>
+          <button type="button" onClick={() => act("link")} disabled={busy} className="rounded-full bg-berry px-6 py-2.5 text-sm font-semibold text-ink transition hover:-translate-y-0.5 active:scale-95 disabled:opacity-40">
+            Liên kết Discord
+          </button>
+        </div>
+      )}
+      {msg && <p role="status" className="mt-3 text-sm text-emerald-300">{msg}</p>}
+    </section>
   );
 }
 
@@ -6236,6 +6513,99 @@ export const rememberOrder = (o: { code: string; token: string }) =>
 
 // Cho phép mở giỏ từ nơi khác (nút "Mua key" ở trang game).
 export const openCart = () => window.dispatchEvent(new Event("cart-open"));
+
+
+=== FILE: src/lib/discord.ts ===
+
+import { adminClient } from "@/lib/auth-server";
+import { reportError } from "@/lib/notify";
+
+const API = "https://discord.com/api/v10";
+const UA = "DiscordBot (https://gsvhvn.vercel.app, 1.0)"; // Discord/Cloudflare chặn User-Agent mặc định
+export const ACCOUNT_PATH = "/tai-khoan/discord"; // trang Discord trong menu tài khoản
+
+const env = (k: string) => {
+  const v = process.env[k];
+  if (!v) throw new Error(`Thiếu biến môi trường ${k}`);
+  return v;
+};
+
+/** User id từ header "Authorization: Bearer <access_token Supabase>" (cùng cách với /api/orders/mine). */
+export async function userIdFromRequest(req: Request): Promise<string | null> {
+  const token = req.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
+  if (!token) return null;
+  return (await adminClient().auth.getUser(token)).data.user?.id ?? null;
+}
+
+export const authorizeUrl = (state: string) =>
+  "https://discord.com/oauth2/authorize?" +
+  new URLSearchParams({
+    client_id: env("DISCORD_CLIENT_ID"),
+    redirect_uri: env("DISCORD_REDIRECT_URI"),
+    response_type: "code",
+    scope: "identify guilds.join", // guilds.join: bot tự kéo khách vào server kèm role
+    state,
+  });
+
+type DiscordUser = { id: string; username: string; global_name: string | null; avatar: string | null };
+
+export async function exchangeCode(code: string): Promise<{ token: string; me: DiscordUser }> {
+  const t = await fetch(`${API}/oauth2/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA },
+    body: new URLSearchParams({
+      client_id: env("DISCORD_CLIENT_ID"),
+      client_secret: env("DISCORD_CLIENT_SECRET"),
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: env("DISCORD_REDIRECT_URI"),
+    }),
+  });
+  if (!t.ok) throw new Error(`Discord token ${t.status}: ${await t.text()}`);
+  const token = (await t.json()).access_token as string;
+  const m = await fetch(`${API}/users/@me`, { headers: { Authorization: `Bearer ${token}`, "User-Agent": UA } });
+  if (!m.ok) throw new Error(`Discord /users/@me ${m.status}`);
+  return { token, me: await m.json() };
+}
+
+const bot = (path: string, method: string, body?: unknown) =>
+  fetch(API + path, {
+    method,
+    headers: { Authorization: `Bot ${env("DISCORD_BOT_TOKEN")}`, "Content-Type": "application/json", "User-Agent": UA },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+export type SyncState = "ok" | "no_purchase" | "not_in_guild" | "error";
+
+/**
+ * Cấp role Discord nếu tài khoản đã liên kết VÀ có đơn key đã thanh toán. Chạy lại bao nhiêu lần cũng được.
+ * oauthToken chỉ có ngay lúc liên kết: dùng để kéo khách vào server nếu chưa ở trong.
+ */
+export async function syncRole(userId: string, oauthToken?: string): Promise<SyncState> {
+  const db = adminClient();
+  const { data: link } = await db.from("discord_links").select("discord_id").eq("user_id", userId).maybeSingle();
+  if (!link) return "error";
+  const discordId: string = link.discord_id;
+
+  const { count } = await db
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("kind", "key")
+    .eq("status", "paid");
+
+  let state: SyncState = "no_purchase";
+  if (count) {
+    const g = env("DISCORD_GUILD_ID");
+    const role = env("DISCORD_ROLE_ID");
+    if (oauthToken) await bot(`/guilds/${g}/members/${discordId}`, "PUT", { access_token: oauthToken, roles: [role] });
+    const r = await bot(`/guilds/${g}/members/${discordId}/roles/${role}`, "PUT");
+    state = r.status === 204 ? "ok" : r.status === 404 ? "not_in_guild" : "error";
+    if (state === "error") await reportError(new Error(`Discord cấp role lỗi ${r.status}: ${await r.text()}`), { source: "server", path: "/api/discord", method: "POST" });
+  }
+  await db.from("discord_links").update({ sync_state: state, synced_at: new Date().toISOString() }).eq("user_id", userId);
+  return state;
+}
 
 
 === FILE: src/lib/game-badges.ts ===
