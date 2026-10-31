@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { adminClient } from "@/lib/auth-server";
+import { adminClient, sameOrigin } from "@/lib/auth-server";
 import { json } from "@/lib/admin-guard";
 import { reportError } from "@/lib/notify";
 import { ORDER_PREFIX } from "@/lib/payment";
@@ -38,6 +38,30 @@ export async function GET(req: Request, { params }: { params: Promise<{ code: st
     return json(out);
   } catch (e) {
     await reportError(e, { source: "server", path: "/api/orders/[code]", method: "GET" });
+    return json({ code: "error" }, 500);
+  }
+}
+
+// DELETE /api/orders/GSVHxxxxxx?t=<token>: khách bấm "Hủy, quay lại giỏ" -> nhả ngay lượt voucher đang bị đơn chờ này giữ.
+// Chỉ tác động đơn ĐANG CHỜ CÓ voucher; đơn không voucher giữ nguyên hành vi cũ (chờ hết hạn).
+export async function DELETE(req: Request, { params }: { params: Promise<{ code: string }> }) {
+  if (!sameOrigin(req)) return json({ code: "forbidden" }, 403);
+  const { code } = await params;
+  if (!new RegExp(`^${ORDER_PREFIX}[A-Z0-9]{6}$`).test(code)) return json({ code: "invalid" }, 400);
+  const t = new URL(req.url).searchParams.get("t") ?? "";
+  try {
+    const db = adminClient();
+    const { data, error } = await db.from("orders").select("id, status, token, voucher_id").eq("code", code).maybeSingle();
+    if (error) throw error;
+    if (!data) return json({ code: "not_found" }, 404);
+    if (!t || !safeEq(t, data.token)) return json({ code: "forbidden" }, 403);
+    if (data.status === "pending" && data.voucher_id) {
+      const u = await db.from("orders").update({ status: "expired" }).eq("id", data.id).eq("status", "pending"); // điều kiện status: không đè lên đơn vừa được thanh toán
+      if (u.error) throw u.error;
+    }
+    return json({ ok: true });
+  } catch (e) {
+    await reportError(e, { source: "server", path: "/api/orders/[code]", method: "DELETE" });
     return json({ code: "error" }, 500);
   }
 }

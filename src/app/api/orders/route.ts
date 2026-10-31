@@ -3,13 +3,14 @@ import { json } from "@/lib/admin-guard";
 import { reportError } from "@/lib/notify";
 import { games } from "@/data/games";
 import { MAX_AMOUNT, MIN_AMOUNT, ORDER_TTL_MIN, bankInfo, newOrderCode, qrUrl } from "@/lib/payment";
+import { normVoucher, voucherFail } from "@/lib/voucher";
 
 // shortcut: đếm theo từng instance serverless, chỉ là lưới thô chống spam tạo đơn.
 const hits = new Map<string, { n: number; reset: number }>();
 const MAX_PER_MIN = 6;
 const MAX_ITEMS = 20;
 
-// POST {slugs: string[]} -> đơn mua key (giá tính ở server)   |   POST {amount, note?} -> đơn donate.
+// POST {slugs: string[], voucher?: string} -> đơn mua key (giá + giảm giá tính ở server)   |   POST {amount, note?} -> đơn donate.
 // Đăng nhập là tùy chọn: có token hợp lệ thì gắn user_id.
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return json({ code: "forbidden" }, 403);
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
   if (!h || now > h.reset) hits.set(ip, { n: 1, reset: now + 60_000 });
   else if (++h.n > MAX_PER_MIN) return json({ code: "rate" }, 429);
 
-  let b: { amount?: unknown; note?: unknown; slugs?: unknown };
+  let b: { amount?: unknown; note?: unknown; slugs?: unknown; voucher?: unknown };
   try { b = await req.json(); } catch { return json({ code: "invalid" }, 400); }
 
   try {
@@ -47,6 +48,30 @@ export async function POST(req: Request) {
 
       // Dọn đơn hết hạn để số tiền lẻ được dùng lại (chỉ mục UNIQUE theo số tiền của đơn đang chờ).
       await db.from("orders").update({ status: "expired" }).eq("status", "pending").eq("kind", "key").lt("expires_at", new Date().toISOString());
+
+      // Có voucher: hàm SQL create_voucher_order khóa dòng voucher, kiểm lượt, tính giảm và tạo đơn trong MỘT transaction.
+      const wantVoucher = b.voucher != null && b.voucher !== "";
+      if (wantVoucher) {
+        const vcode = normVoucher(b.voucher);
+        if (!vcode) return json({ code: "voucher_not_found" }, 404);
+        const items = rows.map((r) => ({ slug: r.slug, price: r.price, fee: r.fee }));
+        for (let i = 0; i < 12; i++) {
+          const suffix = 1 + Math.floor(Math.random() * 999);
+          const code = newOrderCode();
+          const { data, error } = await db.rpc("create_voucher_order", {
+            p_order_code: code, p_suffix: suffix, p_user: userId, p_expires: expiresAt,
+            p_voucher: vcode, p_subtotal: subtotal, p_min: MIN_AMOUNT, p_items: items,
+          });
+          if (error) { if (error.code === "23505") continue; throw error; } // trùng mã/số tiền: transaction đã rollback, thử lại
+          const r = data as { ok: boolean; error?: string; token?: string; amount?: number; discount?: number; free?: boolean };
+          if (!r.ok) { const f = voucherFail(r.error); return json({ code: f.code }, f.status); }
+          const amount = r.amount as number;
+          // Voucher giảm hết: đơn đã paid sẵn, không có QR/số lẻ; client lấy key ngay qua GET /api/orders/[code].
+          if (r.free) return json({ code, token: r.token, amount: 0, suffix: 0, subtotal, discount: r.discount, free: true, expiresAt, qr: "", bank: bankInfo() });
+          return json({ code, token: r.token, amount, suffix, subtotal, discount: r.discount, expiresAt, qr: qrUrl(amount, code), bank: bankInfo() });
+        }
+        return json({ code: "busy" }, 503);
+      }
 
       for (let i = 0; i < 12; i++) {
         const suffix = 1 + Math.floor(Math.random() * 999);

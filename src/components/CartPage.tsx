@@ -7,9 +7,18 @@ import { clearCart, rememberOrder, removeFromCart, useCart, usePastOrders } from
 import { loadKeyRows, type Price } from "@/lib/key-prices";
 import { useGameMeta } from "@/lib/game-meta";
 
-type Order = { code: string; token: string; amount: number; suffix: number; subtotal: number; expiresAt: string; qr: string; bank: { bankName: string; accountNumber: string; accountHolder: string } };
+type Order = { code: string; token: string; amount: number; suffix: number; subtotal: number; discount?: number; free?: boolean; expiresAt: string; qr: string; bank: { bankName: string; accountNumber: string; accountHolder: string } };
 type Key = { slug: string; title: string; password: string };
 type Status = "pending" | "paid" | "underpaid" | "expired";
+type Applied = { code: string; discount: number; total: number; forCart: string }; // forCart: giỏ lúc xác nhận, giỏ đổi thì hỏi lại server
+
+const VOUCHER_ERR: Record<string, string> = {
+  voucher_not_found: "Mã không đúng hoặc đã bị tắt.",
+  voucher_exhausted: "Mã này đã hết lượt sử dụng.",
+  voucher_not_applicable: "Mã không áp dụng được cho đơn này.",
+  rate: "Bạn thử mã quá nhanh, đợi một lúc rồi thử lại.",
+  unavailable: "Có game trong giỏ đã ngừng bán key. Hãy xóa nó khỏi giỏ.",
+};
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ";
 const FB = /^https?:\/\//i.test(site.facebook) ? site.facebook : "";
@@ -22,7 +31,7 @@ const Cart = ({ cls = "size-5" }: { cls?: string }) => (
     <circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" /><path d="M2.5 3.5h2.7l2.3 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 7.5H6" />
   </svg>
 );
-const cp = "shrink-0 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold transition hover:bg-white/20 active:scale-95";
+const cp = "shrink-0 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold transition hover:bg-white/20 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50";
 const primary = "flex w-full items-center justify-center gap-2 rounded-full bg-berry px-7 py-4 text-base font-semibold text-ink shadow-md shadow-black/30 transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50";
 const ghost = "w-full rounded-full bg-white/10 px-6 py-3 text-sm font-semibold transition hover:bg-white/20 active:scale-95";
 
@@ -41,6 +50,10 @@ export default function CartPage() {
   const [err, setErr] = useState<string | null>(null);
   const [left, setLeft] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
+  const [vInput, setVInput] = useState("");
+  const [voucher, setVoucher] = useState<Applied | null>(null);
+  const [vBusy, setVBusy] = useState(false);
+  const [vErr, setVErr] = useState<string | null>(null);
 
   useEffect(() => {
     let dead = false;
@@ -61,6 +74,44 @@ export default function CartPage() {
   const total = lines.reduce((s, l) => s + (l.p ? l.p.price + l.p.fee : 0), 0);
   const missing = !!prices && lines.some((l) => !l.p);
 
+  const cartKey = cart.join(",");
+  const vStale = !!voucher && voucher.forCart !== cartKey;   // giỏ vừa đổi, đang hỏi lại server
+  const payable = voucher ? voucher.total : total;
+
+  // Hỏi server giảm bao nhiêu cho giỏ hiện tại (server tính; client chỉ hiển thị).
+  const quote = useCallback(async (code: string): Promise<{ ok: true; a: Applied } | { ok: false; err: string }> => {
+    try {
+      const res = await fetch("/api/vouchers/check", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, slugs: cart }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, err: VOUCHER_ERR[body.code] ?? "Không kiểm tra được mã. Thử lại sau ít phút." };
+      return { ok: true, a: { code: body.voucher, discount: body.discount, total: body.total, forCart: cart.join(",") } };
+    } catch { return { ok: false, err: "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại." }; }
+  }, [cart]);
+
+  const applyVoucher = async () => {
+    const code = vInput.trim();
+    if (!code || vBusy || cart.length === 0) return;
+    setVBusy(true); setVErr(null);
+    const r = await quote(code);
+    if (r.ok) { setVoucher(r.a); setVInput(""); } else setVErr(r.err);
+    setVBusy(false);
+  };
+
+  // Giỏ đổi sau khi đã áp mã (xóa game...): tính lại; giỏ rỗng (vd. đã thanh toán) thì bỏ mã.
+  useEffect(() => {
+    if (!voucher) return;
+    if (cart.length === 0) { setVoucher(null); return; }
+    if (voucher.forCart === cartKey) return;
+    let dead = false;
+    quote(voucher.code).then((r) => {
+      if (dead) return;
+      if (r.ok) setVoucher(r.a); else { setVoucher(null); setVErr(r.err); }
+    });
+    return () => { dead = true; };
+  }, [voucher, cart, cartKey, quote]);
+
   const checkout = async () => {
     if (busy || cart.length === 0) return;
     setBusy(true); setErr(null);
@@ -69,16 +120,28 @@ export default function CartPage() {
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ slugs: cart }),
+        body: JSON.stringify({ slugs: cart, ...(voucher ? { voucher: voucher.code } : {}) }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (typeof body.code === "string" && body.code.startsWith("voucher_")) {
+          setVoucher(null); setVErr(null); setErr((VOUCHER_ERR[body.code] ?? "Voucher không dùng được.") + " Đã bỏ mã khỏi đơn, kiểm tra lại giá rồi thanh toán.");
+          return;
+        }
         setErr(body.code === "unavailable" ? "Có game trong giỏ đã ngừng bán key. Hãy xóa nó khỏi giỏ." :
           body.code === "rate" ? "Bạn thao tác quá nhanh, đợi một lúc rồi thử lại." :
           body.code === "busy" ? "Hệ thống đang bận, thử lại sau vài giây." : "Không tạo được đơn. Thử lại sau ít phút.");
         return;
       }
       rememberOrder({ code: body.code, token: body.token });
+      if (body.free) {   // voucher giảm hết: đơn đã paid, lấy key luôn, không qua bước chuyển khoản
+        const r = await fetch(`/api/orders/${body.code}?t=${encodeURIComponent(body.token)}`, { cache: "no-store" });
+        const d = r.ok ? await r.json() as { keys?: Key[] } : {};
+        setOrder(body as Order); setStatus("paid"); setPaid(0); setKeys(d.keys ?? []); setVoucher(null);
+        clearCart(); saveActive(null);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       saveActive(body as Order);
       setOrder(body as Order); setStatus("pending"); setPaid(null); setKeys([]);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -124,6 +187,14 @@ export default function CartPage() {
   };
 
   const expired = !!order && (status === "expired" || left === 0);
+
+  // "Hủy, quay lại giỏ": đơn có voucher đang giữ 1 lượt, báo server nhả ngay (không đợi 30 phút hết hạn).
+  const cancel = () => {
+    if (order && status !== "paid" && !expired && (order.discount ?? 0) > 0) {
+      fetch(`/api/orders/${order.code}?t=${encodeURIComponent(order.token)}`, { method: "DELETE" }).catch(() => { /* hết hạn sẽ tự nhả */ });
+    }
+    reset();
+  };
   const step = !order ? 0 : status === "paid" ? 2 : 1;
 
   const help = (
@@ -178,8 +249,8 @@ export default function CartPage() {
             <span className="mx-auto grid size-16 place-items-center rounded-full bg-emerald-500/20 text-emerald-300">
               <svg viewBox="0 0 24 24" className="size-9" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m5.5 12.5 4.2 4.2 8.8-9.2" /></svg>
             </span>
-            <p className="font-display text-2xl font-bold">Đã thanh toán</p>
-            <p className="text-sm text-haze">Đã nhận <b className="text-mist">{fmt(paid ?? order.amount)}</b> · đơn <span className="font-mono">{order.code}</span></p>
+            <p className="font-display text-2xl font-bold">{order.free ? "Nhận key thành công" : "Đã thanh toán"}</p>
+            <p className="text-sm text-haze">{order.free ? <>Miễn phí bằng voucher</> : <>Đã nhận <b className="text-mist">{fmt(paid ?? order.amount)}</b></>} · đơn <span className="font-mono">{order.code}</span></p>
             <Link href={`/tai-khoan/key?order=${order.code}`} onClick={reset} className={primary}>Hiện key</Link>
             {keys.length === 0 && help}
           </aside>
@@ -247,10 +318,15 @@ export default function CartPage() {
                 ))}
                 {cart.length === 0 && <li className="px-1 text-sm text-haze">{fmt(order.subtotal)}</li>}
               </ul>
+              {!!order.discount && (
+                <p className="mt-3 flex items-center justify-between border-t border-white/10 px-1 pt-3 text-sm">
+                  <span className="text-haze">Đã giảm bằng voucher</span><b className="tabular-nums text-emerald-300">−{fmt(order.discount)}</b>
+                </p>
+              )}
             </div>
 
             {help}
-            <button type="button" onClick={reset} className={ghost}>{expired ? "Quay lại giỏ" : "Hủy, quay lại giỏ"}</button>
+            <button type="button" onClick={cancel} className={ghost}>{expired ? "Quay lại giỏ" : "Hủy, quay lại giỏ"}</button>
           </div>
         </section>
       )}
@@ -294,11 +370,33 @@ export default function CartPage() {
             <h2 className="font-display text-xl font-bold">Tóm tắt đơn</h2>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between"><dt className="text-haze">Số game</dt><dd className="font-semibold">{cart.length}</dd></div>
-              <div className="flex items-baseline justify-between border-t border-white/10 pt-3"><dt className="text-haze">Tạm tính</dt><dd className="font-display text-3xl font-extrabold tabular-nums">{fmt(total)}</dd></div>
+              {voucher && (
+                <>
+                  <div className="flex justify-between"><dt className="text-haze">Tạm tính</dt><dd className="tabular-nums">{fmt(total)}</dd></div>
+                  <div className="flex justify-between text-emerald-300"><dt>Voucher <span className="font-mono">{voucher.code}</span></dt><dd className="tabular-nums">−{fmt(voucher.discount)}</dd></div>
+                </>
+              )}
+              <div className="flex items-baseline justify-between border-t border-white/10 pt-3"><dt className="text-haze">{voucher ? "Cần thanh toán" : "Tạm tính"}</dt><dd className={`font-display text-3xl font-extrabold tabular-nums transition-opacity ${vStale ? "opacity-50" : ""}`}>{payable === 0 ? "Miễn phí" : fmt(payable)}</dd></div>
             </dl>
+            <div className="space-y-2">
+              {voucher ? (
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3">
+                  <span className="min-w-0 text-sm"><b className="block truncate font-mono text-emerald-300">{voucher.code}</b><span className="text-xs text-haze">Đã áp dụng voucher</span></span>
+                  <button type="button" onClick={() => { setVoucher(null); setVErr(null); }} className={cp}>Bỏ</button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input value={vInput} onChange={(e) => setVInput(e.target.value.toUpperCase())} onKeyDown={(e) => { if (e.key === "Enter") applyVoucher(); }}
+                         maxLength={32} placeholder="Mã voucher" aria-label="Mã voucher" autoCapitalize="characters" autoComplete="off" spellCheck={false}
+                         className="min-w-0 flex-1 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2.5 font-mono text-sm tracking-wide outline-none transition placeholder:font-sans placeholder:tracking-normal placeholder:text-haze/70 focus:border-white/30" />
+                  <button type="button" onClick={applyVoucher} disabled={vBusy || !vInput.trim() || !prices || prices.size === 0 || missing} className={cp}>{vBusy ? "Đang kiểm tra…" : "Áp dụng"}</button>
+                </div>
+              )}
+              {vErr && <p role="alert" className="px-2 text-xs text-red-300">{vErr}</p>}
+            </div>
             {err && <p role="alert" className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{err}</p>}
-            <button type="button" onClick={checkout} disabled={busy || missing || !prices || prices.size === 0} className={primary}>
-              {busy ? "Đang tạo mã QR…" : `Thanh toán ${fmt(total)}`}
+            <button type="button" onClick={checkout} disabled={busy || vStale || missing || !prices || prices.size === 0} className={primary}>
+              {busy ? (voucher && payable === 0 ? "Đang lấy key…" : "Đang tạo mã QR…") : voucher && payable === 0 ? "Nhận key miễn phí" : `Thanh toán ${fmt(payable)}`}
             </button>
             <ul className="space-y-1.5 text-xs text-haze">
               <li>• Chuyển khoản MB/MoMo, quét QR là xong.</li>

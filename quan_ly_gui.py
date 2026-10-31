@@ -6,8 +6,9 @@ Cách dùng: đặt file này CẠNH quan_ly.py (thư mục mysite) rồi chạy
 - Thêm / sửa / xóa game ngay trong cửa sổ. Kiểm tra lỗi + Đẩy lên Vercel có khung log.
 - Ảnh chính + ảnh bổ sung (nén WebP, đóng dấu logo) và nội dung nhiều khổ sửa ngay trong cửa sổ.
 - Nút "Key game": bảng giá key / phí / mật khẩu ZIP / bật-tắt bán (Supabase, cần .env.local).
-- Nút "Cài đặt web & tài khoản": đủ 7 mục của CMD 7 (chữ/link web, báo lỗi Discord, khóa đăng nhập, tài khoản, lỗi hệ thống,
-  Donate, Key game). Mục 1-6 chạy NGUYÊN BẢN logic của quan_ly.py: menu / danh sách số thành nút bấm, câu hỏi thành ô nhập.
+- Nút "Voucher": tạo mã giảm giá (nhập mã bất kỳ hoặc tự sinh hàng loạt, số lượt bất kỳ, mặc định 1), đổi lượt, bật/tắt, xóa.
+- Nút "Cài đặt web & tài khoản": đủ 8 mục của CMD 7 (chữ/link web, báo lỗi Discord, khóa đăng nhập, tài khoản, lỗi hệ thống,
+  Donate, Key game, Voucher). Mục 1-6 chạy NGUYÊN BẢN logic của quan_ly.py: menu / danh sách số thành nút bấm, câu hỏi thành ô nhập.
 """
 import builtins, contextlib, ctypes, datetime, os, queue, re, shutil, subprocess, sys, threading, unicodedata
 import tkinter as tk
@@ -540,6 +541,175 @@ class KeysWindow(tk.Toplevel):
         run_bg(self, job, lambda res, err: messagebox.showerror("Lỗi", err, parent=self) if err else self.load())
 
 
+# ---------- voucher: mã giảm giá (Supabase, có hiệu lực ngay; cần chạy supabase/vouchers.sql một lần) ----------
+VOUCHER_KINDS = {"Phần trăm (%)": "percent", "Số tiền cố định (đ)": "fixed"}
+
+
+class VoucherDialog(tk.Toplevel):
+    def __init__(self, win):
+        super().__init__(win, bg=PANEL)
+        self.win = win
+        self.title("Tạo voucher"); self.transient(win); self.resizable(False, False)
+        body = tk.Frame(self, bg=PANEL, padx=34, pady=28); body.pack()
+        tk.Label(body, text="Tạo voucher", bg=PANEL, fg=TEXT, font=("Segoe UI", 16, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        self.v_code, self.v_qty, self.v_kind = tk.StringVar(), tk.StringVar(value="1"), tk.StringVar(value="Phần trăm (%)")
+        self.v_value, self.v_uses, self.v_note = tk.StringVar(), tk.StringVar(value="1"), tk.StringVar()
+        rows = [("code", "Mã voucher\n(trống = tự sinh ngẫu nhiên)", self.v_code), ("qty", "Số lượng mã\n(chỉ khi tự sinh)", self.v_qty),
+                ("kind", "Loại giảm", self.v_kind), ("value", "Giá trị giảm\n(% hoặc đ)", self.v_value),
+                ("uses", "Số lượt dùng MỖI mã", self.v_uses), ("note", "Ghi chú (tùy chọn)", self.v_note)]
+        self.w = {}   # khóa là chuỗi: tkinter.Variable không hash được nên không dùng làm khóa dict
+        for i, (key, label, var) in enumerate(rows, 1):
+            tk.Label(body, text=label, bg=PANEL, fg=MUTED, font=FONT_S, justify="left").grid(row=i, column=0, sticky="w", pady=7, padx=(0, 18))
+            if key == "kind":
+                w = ttk.Combobox(body, textvariable=var, values=list(VOUCHER_KINDS), state="readonly", width=36)
+                w.grid(row=i, column=1, sticky="ew", pady=7, ipady=4)
+            else:
+                w = entry(body, var, 38); w.grid(row=i, column=1, sticky="ew", pady=7, ipady=7)
+            self.w[key] = w
+        self.v_code.trace_add("write", lambda *a: self.sync())
+        self.sync()
+        tk.Label(body, text="Mã chỉ gồm chữ A-Z, số, gạch ngang/dưới (2-32 ký tự), tự IN HOA. Giảm 100% (hoặc số tiền ≥ giá đơn) = đơn MIỄN PHÍ, khách nhận key ngay. Giảm một phần thì sau giảm tối thiểu 1.000đ.",
+                 bg=PANEL, fg=MUTED, font=FONT_S, wraplength=430, justify="left").grid(row=7, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        bar = tk.Frame(body, bg=PANEL); bar.grid(row=8, column=0, columnspan=2, sticky="e", pady=(16, 0))
+        button(bar, "Hủy", self.destroy).pack(side="left", padx=(0, 8)); button(bar, "Tạo", self.save, "primary").pack(side="left")
+        self.bind("<Escape>", lambda e: self.destroy()); self.bind("<Return>", lambda e: self.save())
+        self.update_idletasks()
+        self.geometry(f"+{win.winfo_x() + (win.winfo_width() - self.winfo_width()) // 2}+{win.winfo_y() + 70}")
+        self.grab_set(); self.w["code"].focus_set()
+
+    def sync(self):   # nhập mã cụ thể thì ô "số lượng" không dùng
+        self.w["qty"].config(state="disabled" if self.v_code.get().strip() else "normal")
+
+    def save(self):
+        code, kind = q.voucher_norm(self.v_code.get()), VOUCHER_KINDS.get(self.v_kind.get(), "percent")
+        try:
+            value, uses = q.parse_voucher_value(kind, self.v_value.get()), q.parse_voucher_uses(self.v_uses.get())
+            if code and not q.VOUCHER_RE.match(code): raise ValueError("Mã chỉ gồm chữ A-Z, số 0-9, gạch ngang/dưới, dài 2-32 ký tự.")
+            qty = 1
+            if not code:
+                n = self.v_qty.get().strip()
+                if not n.isdigit() or not 1 <= int(n) <= q.VOUCHER_MAX_QTY: raise ValueError(f"Số lượng mã phải là số nguyên từ 1 đến {q.VOUCHER_MAX_QTY}.")
+                qty = int(n)
+        except ValueError as e:
+            return messagebox.showwarning("Sai dữ liệu", str(e), parent=self)
+        note = self.v_note.get().strip()[:100]
+        def done(res, err):
+            if err: return messagebox.showerror("Tạo thất bại", err, parent=self)
+            win = self.win; self.destroy(); win.load(); win.created(res)
+        self.config(cursor="watch"); run_bg(self, lambda: q.make_vouchers(code, qty, kind, value, uses, note), done)
+
+
+class VouchersWindow(tk.Toplevel):
+    COLS = [("n", "#", 44, "center", False), ("code", "Mã voucher", 230, "w", True), ("desc", "Giảm", 100, "e", False),
+            ("uses", "Đã dùng / Tổng", 190, "w", False), ("left", "Còn lại", 80, "e", False),
+            ("state", "Trạng thái", 120, "w", False), ("note", "Ghi chú", 220, "w", True), ("at", "Tạo lúc", 110, "center", False)]
+
+    def __init__(self, app):
+        super().__init__(app, bg=BG)
+        self.app, self.rows, self.shown = app, [], []
+        self.title("Voucher • mã giảm giá"); self.geometry("1240x720"); self.minsize(960, 480)
+        head = tk.Frame(self, bg=BG, padx=22, pady=16); head.pack(fill="x")
+        left = tk.Frame(head, bg=BG); left.pack(side="left")
+        tk.Label(left, text="Voucher", bg=BG, fg=TEXT, font=("Segoe UI", 24, "bold")).pack(anchor="w")
+        self.stat = tk.Label(left, text="Đang tải…", bg=BG, fg=MUTED, font=FONT_S); self.stat.pack(anchor="w")
+        button(head, "Làm mới", self.load).pack(side="right")
+
+        bar = tk.Frame(self, bg=BG, padx=22, pady=4); bar.pack(fill="x")
+        self.q_var = tk.StringVar(); self.q_var.trace_add("write", lambda *a: self.render())
+        entry(bar, self.q_var, 30).pack(side="left", ipady=6)
+        tk.Label(bar, text="  Tìm mã / ghi chú", bg=BG, fg=MUTED, font=FONT_S).pack(side="left")
+        button(bar, "Xóa", self.delete, "danger").pack(side="right", padx=(8, 0))
+        button(bar, "Chép mã", self.copy_codes).pack(side="right", padx=(8, 0))
+        button(bar, "Bật / tắt", self.toggle).pack(side="right", padx=(8, 0))
+        button(bar, "Đổi số lượt", self.set_uses).pack(side="right", padx=(8, 0))
+        button(bar, "＋ Tạo voucher", lambda: VoucherDialog(self), "primary").pack(side="right")
+
+        self.foot = tk.Label(self, text="", bg=BG, fg=MUTED, font=FONT_S, anchor="w", padx=22, pady=8); self.foot.pack(side="bottom", fill="x")
+        wrap = tk.Frame(self, bg=BG, padx=22, pady=8); wrap.pack(fill="both", expand=True)
+        box = tk.Frame(wrap, bg=PANEL, highlightthickness=1, highlightbackground=LINE); box.pack(fill="both", expand=True)
+        self.tree = ttk.Treeview(box, columns=[c[0] for c in self.COLS], show="headings", selectmode="extended")
+        sb = ttk.Scrollbar(box, orient="vertical", command=self.tree.yview, style="Dark.Vertical.TScrollbar")
+        self.tree.configure(yscrollcommand=sb.set); sb.pack(side="right", fill="y"); self.tree.pack(side="left", fill="both", expand=True)
+        for cid, label, w, anchor, stretch in self.COLS:
+            self.tree.heading(cid, text=label, anchor="w" if anchor == "w" else "center")
+            self.tree.column(cid, width=w, minwidth=40, anchor=anchor, stretch=stretch)
+        self.tree.tag_configure("odd", background=ROW_A); self.tree.tag_configure("even", background=ROW_B)
+        for tg, col in (("ok", OK), ("off", WARN), ("done", MUTED)): self.tree.tag_configure(tg, foreground=col)
+        self.bind("<F5>", lambda e: self.load()); self.bind("<Escape>", lambda e: self.destroy())
+        self.tree.bind("<Control-c>", lambda e: self.copy_codes())
+        self.load()
+
+    def load(self):
+        self.stat.config(text="Đang tải từ Supabase…", fg=MUTED)
+        def job():
+            if not q.sb_config(): raise RuntimeError(NO_SB)
+            return q.voucher_rows()
+        def done(res, err):
+            if err: self.stat.config(text="✗ " + err.splitlines()[0], fg=BAD); return messagebox.showerror("Không tải được voucher", err, parent=self)
+            self.rows = res or []; self.render()
+        run_bg(self, job, done)
+
+    def render(self):
+        kw = fold(self.q_var.get().strip())
+        self.shown = [r for r in self.rows if not kw or kw in fold(r["code"] + " " + (r["note"] or ""))]
+        keep = set(self.tree.selection())
+        self.tree.delete(*self.tree.get_children())
+        n_ok = n_done = n_off = pend = 0
+        for i, r in enumerate(self.shown, 1):
+            icon, label, _ = q.voucher_state(r)
+            n_ok += icon == "●"; n_done += icon == "✓"; n_off += icon == "◌"; pend += r["pending"]
+            left = max(0, r["max_uses"] - r["paid"] - r["pending"])
+            at = str(r["created_at"])[:10]
+            self.tree.insert("", "end", iid=r["id"], values=(i, r["code"], q.voucher_desc(r), q.voucher_uses_text(r), left, f"{icon} {label}", r["note"] or "", at),
+                             tags=("odd" if i % 2 else "even", {"●": "ok", "◌": "off"}.get(icon, "done")))
+        self.tree.selection_set([i for i in self.tree.get_children() if i in keep])
+        self.stat.config(fg=MUTED, text=f"{len(self.rows)} voucher   •   đang có {pend} đơn chờ thanh toán đang giữ lượt")
+        self.foot.config(text=f"●  {n_ok} còn lượt     ✓  {n_done} hết lượt     ◌  {n_off} đang tắt"
+                              "     •     Lượt chỉ bị trừ khi đơn đã thanh toán / đang chờ; đơn hết hạn tự nhả lượt")
+
+    def picked(self):
+        by = {r["id"]: r for r in self.rows}
+        return [by[i] for i in self.tree.selection() if i in by]
+
+    def need(self):
+        p = self.picked()
+        if not p: messagebox.showinfo("Chưa chọn", "Chọn một hoặc nhiều voucher (Ctrl/Shift + nhấp) rồi thao tác.", parent=self)
+        return p
+
+    def created(self, codes):
+        txt = "\n".join(codes)
+        self.clipboard_clear(); self.clipboard_append(txt)
+        shown = "\n".join(codes[:30]) + (f"\n… và {len(codes) - 30} mã nữa" if len(codes) > 30 else "")
+        messagebox.showinfo("Đã tạo voucher", f"Đã tạo {len(codes)} voucher và chép vào clipboard (mỗi mã một dòng):\n\n{shown}", parent=self)
+
+    def copy_codes(self):
+        p = self.picked()
+        if not p: return messagebox.showinfo("Chưa chọn", "Chọn voucher cần chép mã.", parent=self)
+        self.clipboard_clear(); self.clipboard_append("\n".join(r["code"] for r in p)); self.stat.config(text=f"Đã chép {len(p)} mã vào clipboard.", fg=OK)
+
+    def set_uses(self):
+        p = self.need()
+        if not p: return
+        n = simpledialog.askinteger("Đổi số lượt", f"Tổng số lượt dùng mới cho {len(p)} voucher\n(tính cả lượt đã dùng; hiện: {p[0]['max_uses']}):",
+                                    parent=self, minvalue=1, maxvalue=q.VOUCHER_MAX_USES, initialvalue=p[0]["max_uses"])
+        if n is None: return
+        ids = [r["id"] for r in p]
+        run_bg(self, lambda: q.voucher_set(ids, max_uses=n), lambda res, err: messagebox.showerror("Lỗi", err, parent=self) if err else self.load())
+
+    def toggle(self):
+        p = self.need()
+        if not p: return
+        new, ids = not p[0]["enabled"], [r["id"] for r in p]
+        run_bg(self, lambda: q.voucher_set(ids, enabled=new), lambda res, err: messagebox.showerror("Lỗi", err, parent=self) if err else self.load())
+
+    def delete(self):
+        p = self.need()
+        if not p: return
+        if not messagebox.askyesno("Xóa voucher", f"Xóa {len(p)} voucher?\nVoucher đã có đơn hàng sẽ không xóa được (hãy tắt thay vì xóa).", parent=self): return
+        ids = [r["id"] for r in p]
+        run_bg(self, lambda: q.voucher_delete(ids), lambda res, err: messagebox.showerror("Không xóa được", err, parent=self) if err else self.load())
+
+
 # ---------- CMD 7: cài đặt web & tài khoản ----------
 # Các handler của quan_ly.py (do_site, do_alerts...) là menu lồng nhau hỏi đáp bằng input(). Thay vì viết lại từng cái (dễ lệch với
 # CMD), chạy NGUYÊN BẢN trong luồng nền: print() -> khung log, input() -> ô nhập + nút bấm dựng từ các dòng "[k] …" / "N. …".
@@ -700,6 +870,7 @@ class Cmd7Window(tk.Toplevel):
         ("5", "Xem 10 lỗi hệ thống gần nhất", "Lỗi ghi nhận từ web (trình duyệt / máy chủ)", "", "do_errors", True),
         ("6", "Trang Donate", "QR, ngân hàng, STK, nội dung chuyển khoản", "push", "do_donate", False),
         ("7", "Key game", "Giá key, phí, mật khẩu ZIP, bật/tắt bán", "live", None, True),
+        ("8", "Voucher", "Mã giảm giá: tạo mã bất kỳ, số lượt bất kỳ, bật/tắt", "live", None, True),
     ]
     BADGE = {"push": ("cần đẩy lên Vercel", WARN), "live": ("có hiệu lực ngay", OK), "": ("", MUTED)}
 
@@ -736,7 +907,7 @@ class Cmd7Window(tk.Toplevel):
         self.ent.bind("<Return>", lambda e: self.send()); self.ent.config(state="disabled")
         self.console.pack(side="top", fill="both", expand=True, padx=10, pady=(10, 4))
         self.console.write("Mục 1-6 chạy đúng logic của CMD: bấm số trong danh sách (hoặc gõ vào ô nhập), Enter = xong.\n"
-                           "Mục 7 mở bảng Key game riêng.\n", "head")
+                           "Mục 7 và 8 mở bảng Key game / Voucher riêng.\n", "head")
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.after(40, self.pump)
 
@@ -764,6 +935,7 @@ class Cmd7Window(tk.Toplevel):
     def open(self, key):
         item = next(i for i in self.ITEMS if i[0] == key)
         if key == "7": return self.app.open_keys()
+        if key == "8": return self.app.open_vouchers()
         if self.running or self.app.busy:
             return messagebox.showinfo("Đang bận", "Đang chạy một tác vụ khác. Thoát mục hiện tại (Enter / 0) hoặc bấm Dừng.", parent=self)
         _, name, _, kind, fname, need_sb = item
@@ -885,6 +1057,7 @@ class App(tk.Tk):
         button(tools, "⬆  Đẩy lên Vercel", self.do_push, "primary").pack(side="right")
         button(tools, "Mở CMD đầy đủ", self.open_cli).pack(side="right", padx=(0, 10))
         button(tools, "🔑 Key game", self.open_keys).pack(side="left")
+        button(tools, "🎟 Voucher", self.open_vouchers).pack(side="left", padx=(10, 0))
         button(tools, "⚙ Cài đặt web & tài khoản", self.open_cmd7).pack(side="left", padx=10)
         button(tools, "Kiểm tra lỗi", self.do_check).pack(side="left")
         button(tools, "Làm mới (F5)", self.reload).pack(side="left", padx=10)
@@ -1029,6 +1202,10 @@ class App(tk.Tk):
     def open_keys(self):
         if getattr(self, "keys_win", None) and self.keys_win.winfo_exists(): return self.keys_win.lift()
         self.keys_win = KeysWindow(self)
+
+    def open_vouchers(self):
+        if getattr(self, "vouchers_win", None) and self.vouchers_win.winfo_exists(): return self.vouchers_win.lift()
+        self.vouchers_win = VouchersWindow(self)
 
     def open_cmd7(self):
         if getattr(self, "cmd7_win", None) and self.cmd7_win.winfo_exists(): return self.cmd7_win.lift()

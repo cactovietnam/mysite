@@ -1602,6 +1602,144 @@ def do_keys():
         input(_c("90", "  Enter để quay lại danh sách… "))
 
 
+# --- [8] voucher: mã giảm giá (bảng Supabase vouchers, có hiệu lực ngay; cần chạy supabase/vouchers.sql MỘT LẦN) ---
+# Mã IN HOA, 2-32 ký tự A-Z 0-9 _ - (khớp src/lib/voucher.ts + ràng buộc trong SQL). Mỗi mã có tổng số lượt dùng (mặc định 1).
+# Lượt đang bị giữ = đơn đã thanh toán + đơn đang chờ chưa hết hạn; đơn hết hạn/hủy tự nhả lượt.
+VOUCHER_RE = re.compile(r"^[A-Z0-9_-]{2,32}$")
+VOUCHER_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"   # bỏ ký tự dễ nhầm 0/O, 1/I
+VOUCHER_MAX_FIXED, VOUCHER_MAX_USES, VOUCHER_MAX_QTY = 5_000_000, 1_000_000, 500
+
+class VoucherExists(ValueError): pass
+
+def voucher_norm(s): return s.strip().upper()
+
+def gen_voucher_code(n=8): return "".join(secrets.choice(VOUCHER_ALPHABET) for _ in range(n))
+
+def _v_call(method, path, body=None, prefer=None):
+    try: return sb_call(method, path, body, prefer)
+    except RuntimeError as e:
+        if any(k in str(e) for k in ("PGRST202", "PGRST205", "42P01", "42703")):
+            raise RuntimeError("Chưa cài voucher trên Supabase: mở supabase/vouchers.sql, dán vào Supabase > SQL Editor rồi bấm Run (chỉ làm một lần).") from None
+        raise
+
+def voucher_rows(): return _v_call("POST", "/rest/v1/rpc/admin_voucher_list", {}) or []
+
+def voucher_desc(r): return f"{r['value']}%" if r["kind"] == "percent" else _vnd(r["value"])
+
+def voucher_state(r):
+    if not r["enabled"]: return "◌", "đang TẮT", "33"
+    if r["paid"] + r["pending"] >= r["max_uses"]: return "✓", "hết lượt", "90"
+    return "●", "còn lượt", "32"
+
+def voucher_uses_text(r):
+    return f"{r['paid']}/{r['max_uses']}" + (f" (+{r['pending']} chờ thanh toán)" if r["pending"] else "")
+
+def parse_voucher_value(kind, text):
+    s = str(text).strip().lower().replace(".", "").replace(",", "").rstrip("đd% ")
+    if not s.isdigit(): raise ValueError("Giá trị phải là số nguyên.")
+    n = int(s)
+    if kind == "percent" and not 1 <= n <= 100: raise ValueError("Giảm theo % phải từ 1 đến 100.")
+    if kind == "fixed" and not 1 <= n <= VOUCHER_MAX_FIXED: raise ValueError("Giảm theo tiền phải từ 1 đến 5.000.000.")
+    return n
+
+def parse_voucher_uses(text):
+    s = str(text).strip().replace(".", "").replace(",", "")
+    if not s.isdigit() or not 1 <= int(s) <= VOUCHER_MAX_USES: raise ValueError("Số lượt phải là số nguyên từ 1 đến 1.000.000.")
+    return int(s)
+
+def _create_vouchers(codes, kind, value, max_uses, note):
+    for c in codes:
+        if not VOUCHER_RE.match(c): raise ValueError(f"Mã '{c}' không hợp lệ: chỉ dùng chữ A-Z, số 0-9, gạch ngang/dưới, dài 2-32 ký tự.")
+    body = [{"code": c, "kind": kind, "value": value, "max_uses": max_uses, "note": note} for c in codes]
+    try: _v_call("POST", "/rest/v1/vouchers", body, prefer="return=minimal")       # 1 câu lệnh = tất cả hoặc không cái nào
+    except RuntimeError as e:
+        if "23505" in str(e): raise VoucherExists("Mã đã tồn tại (trùng voucher khác).") from None
+        raise
+
+def make_vouchers(code, qty, kind, value, max_uses, note=""):
+    """code có giá trị -> tạo đúng mã đó. code rỗng -> tự sinh qty mã ngẫu nhiên không trùng. Trả danh sách mã đã tạo."""
+    if code:
+        codes = [voucher_norm(code)]; _create_vouchers(codes, kind, value, max_uses, note); return codes
+    if not 1 <= qty <= VOUCHER_MAX_QTY: raise ValueError(f"Số lượng mã phải từ 1 đến {VOUCHER_MAX_QTY}.")
+    for _ in range(5):
+        codes = set()
+        while len(codes) < qty: codes.add(gen_voucher_code())
+        codes = sorted(codes)
+        try: _create_vouchers(codes, kind, value, max_uses, note); return codes
+        except VoucherExists: continue
+    raise ValueError("Không sinh được mã không trùng, thử lại.")
+
+def _v_ids(ids): return "id=in.(" + ",".join(quote(i, safe="-") for i in ids) + ")"
+
+def voucher_set(ids, **fields):
+    if ids: _v_call("PATCH", "/rest/v1/vouchers?" + _v_ids(ids), fields, prefer="return=minimal")
+
+def voucher_delete(ids):
+    try: _v_call("DELETE", "/rest/v1/vouchers?" + _v_ids(ids), prefer="return=minimal")
+    except RuntimeError as e:
+        if "23503" in str(e): raise ValueError("Có voucher đã gắn với đơn hàng nên không xóa được (giữ lịch sử đơn). Hãy TẮT voucher đó thay vì xóa.") from None
+        raise
+
+def _v_show(rows):
+    print(); _box([_c("1;36", "VOUCHER") + "  ·  mã giảm giá, có hiệu lực ngay trên web"])
+    print("\n  " + _c("90", f"{'#':>3}  {_pad('Mã', 34)} {'Giảm':>10}  {_pad('Đã dùng / Tổng', 32)} {_pad('Trạng thái', 12)} Ghi chú"))
+    print("  " + _c("90", "─" * 100))
+    for i, r in enumerate(rows, 1):
+        icon, label, col = voucher_state(r)
+        print(f"  {i:>3}  {_pad(r['code'], 34)} {voucher_desc(r):>10}  {_pad(voucher_uses_text(r), 32)} " + _c(col, _pad(f"{icon} {label}", 12)) + f" {_cut(r['note'] or '', 24)}")
+    if not rows: print(_c("90", "  (chưa có voucher nào)"))
+    print("  " + _c("90", "─" * 100) + "\n")
+
+def _v_create_cli():
+    code = voucher_norm(ask("  Mã voucher (Enter = tự sinh ngẫu nhiên)"))
+    if code and not VOUCHER_RE.match(code):
+        print(_c("31", "  ✗ Chỉ dùng chữ A-Z, số 0-9, gạch ngang/dưới, dài 2-32 ký tự.")); return
+    qty = 1
+    if not code:
+        s = ask("  Số lượng mã cần tạo", "1")
+        if not s.isdigit() or not 1 <= int(s) <= VOUCHER_MAX_QTY: print(_c("31", f"  ✗ Nhập số từ 1 đến {VOUCHER_MAX_QTY}.")); return
+        qty = int(s)
+    k = ask("  Loại giảm: 1 = phần trăm (%), 2 = số tiền cố định (đ)", "1")
+    if k not in ("1", "2"): print(_c("31", "  ✗ Chọn 1 hoặc 2.")); return
+    kind = "percent" if k == "1" else "fixed"
+    try:
+        value = parse_voucher_value(kind, ask("  Giảm bao nhiêu (" + ("1-100 %, 100 = miễn phí" if kind == "percent" else "đ, vd 20000; ≥ giá đơn = miễn phí") + ")"))
+        uses = parse_voucher_uses(ask("  Số lượt dùng MỖI mã", "1"))
+        codes = make_vouchers(code, qty, kind, value, uses, ask("  Ghi chú (tùy chọn)"))
+    except ValueError as e:
+        print(_c("31", f"  ✗ {e}")); return
+    desc = f"{value}%" if kind == "percent" else _vnd(value)
+    print(_c("1;32", f"\n  ✓ Đã tạo {len(codes)} voucher") + f" (giảm {desc} · {uses} lượt/mã):")
+    for c in codes[:50]: print("    " + _c("1", c))
+    if len(codes) > 50: print(_c("90", f"    … và {len(codes) - 50} mã nữa (xem trong danh sách)"))
+
+def do_vouchers():
+    while True:
+        rows = voucher_rows(); _v_show(rows)
+        print(" [1] Tạo voucher (nhập mã bất kỳ hoặc tự sinh, số lượt bất kỳ)\n [2] Đổi tổng số lượt\n [3] Bật / tắt\n [4] Xóa (chỉ voucher chưa có đơn)\n [0] Quay lại")
+        c = input("Chọn: ").strip()
+        if c == "0" or not c: return
+        if c == "1": _v_create_cli(); continue
+        if c not in ("2", "3", "4"): continue
+        if not rows: print("  Chưa có voucher."); continue
+        ni = ask_nums("  Số thứ tự voucher (vd: 1 | 2-4 | all; Enter = hủy): ", len(rows))
+        if not ni: continue
+        picked = [rows[i - 1] for i in ni]
+        try:
+            if c == "2":
+                n = parse_voucher_uses(ask("  Tổng số lượt dùng mới (tính cả lượt đã dùng)"))
+                voucher_set([r["id"] for r in picked], max_uses=n)
+            elif c == "3":
+                new = not picked[0]["enabled"]
+                voucher_set([r["id"] for r in picked], enabled=new)
+            else:
+                if input(f"  Xóa {len(picked)} voucher? (y/N): ").strip().lower() != "y": continue
+                voucher_delete([r["id"] for r in picked])
+            print(_c("32", "  ✓ Đã lưu."))
+        except ValueError as e:
+            print(_c("31", f"  ✗ {e}"))
+
+
 # --- menu cmd 7 ---
 CMD7_MENU = """
 === CMD 7: CÀI ĐẶT WEB & TÀI KHOẢN ===
@@ -1612,10 +1750,11 @@ CMD7_MENU = """
  [5] Xem 10 lỗi hệ thống gần nhất
  [6] Trang Donate (QR, ngân hàng, STK, nội dung chuyển khoản)               -> cần đẩy lên Vercel [9]
  [7] Key game (giá key, phí, mật khẩu ZIP, bật/tắt bán)                   -> có hiệu lực ngay
+ [8] Voucher (mã giảm giá, số lượt dùng, bật/tắt)                           -> có hiệu lực ngay
  [0] Quay lại"""
 
 def do_cmd7():
-    handlers = {"2": do_alerts, "3": do_auth_settings, "4": do_accounts, "5": do_errors, "7": do_keys}
+    handlers = {"2": do_alerts, "3": do_auth_settings, "4": do_accounts, "5": do_errors, "7": do_keys, "8": do_vouchers}
     changed = False
     while True:
         print(CMD7_MENU)
